@@ -398,7 +398,7 @@ table.sum-table tr:nth-child(even) td { background: #f8fafc; }
     <div class="sig-section">
         <div class="sig-box"><div style="height:28px;"></div>Xodim imzosi</div>
         <div class="sig-box"><div style="height:28px;"></div>Murabbiy imzosi</div>
-        <div class="sig-box"><div style="height:28px;"></div>Mas'ul shaxs imzosi</div>
+        <div class="sig-box"><div style="height:28px;"></div>Vakolatli shaxs imzosi</div>
     </div>
 
     <div class="page-footer">
