@@ -1,17 +1,44 @@
 <?php
 /**
- * Modul holatini aniqlash (qiymat qaytaradi)
+ * Modul holatini aniqlash (qiymat qaytaradi) — DB + Session
  */
 function getModuleStatus($modId)
 {
+    global $pdo, $userId;
+
+    // DB dan oxirgi urinishni tekshirish
+    try {
+        $s = $pdo->prepare("SELECT status, next_allowed_at FROM reader_test_attempts WHERE user_id=? AND module_id=? ORDER BY attempted_at DESC LIMIT 1");
+        $s->execute([$userId, $modId]);
+        $attempt = $s->fetch(PDO::FETCH_ASSOC);
+        if ($attempt) {
+            if ($attempt['status'] === 'passed') return 'passed';
+            // Muvaffaqiyatsiz va blok
+            if ($attempt['next_allowed_at']) {
+                $now  = new DateTime();
+                $next = new DateTime($attempt['next_allowed_at']);
+                if ($now < $next) return 'blocked';
+            }
+            return 'failed';
+        }
+    } catch (Exception $e) {}
+
+    // Session fallback
     if (isset($_SESSION['reader_test_results'][$modId])) {
         return $_SESSION['reader_test_results'][$modId]['status'] === 'passed' ? 'passed' : 'failed';
     }
-    if (isset($_SESSION['reader_materials_completed'][$modId]))
-        return 'test_ready';
+
+    // Modul tugatilganmi
+    try {
+        $s = $pdo->prepare("SELECT id FROM reader_module_completions WHERE user_id=? AND module_id=?");
+        $s->execute([$userId, $modId]);
+        if ($s->fetchColumn()) return 'test_ready';
+    } catch (Exception $e) {}
+
+    if (isset($_SESSION['reader_materials_completed'][$modId])) return 'test_ready';
+
     $viewed = $_SESSION['reader_materials_viewed'][$modId] ?? [];
-    if (count($viewed) > 0)
-        return 'in_progress';
+    if (count($viewed) > 0) return 'in_progress';
     return 'not_started';
 }
 
@@ -21,11 +48,12 @@ function getModuleStatus($modId)
 function statusBadge($status)
 {
     $map = [
-        'not_started' => ['Boshlanmagan', 'bg-slate-700/50 text-slate-400'],
-        'in_progress' => ['Jarayonda', 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20'],
-        'test_ready' => ['Testga tayyor', 'bg-amber-500/10 text-amber-400 border border-amber-500/20'],
-        'passed' => ["O'tdi", 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'],
-        'failed' => ["O'tmadi", 'bg-red-500/10 text-red-400 border border-red-500/20'],
+        'not_started' => ['Boshlanmagan',   'bg-slate-700/50 text-slate-400'],
+        'in_progress' => ['Jarayonda',       'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20'],
+        'test_ready'  => ['Testga tayyor',   'bg-amber-500/10 text-amber-400 border border-amber-500/20'],
+        'passed'      => ["O'tdi",           'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'],
+        'failed'      => ["O'tmadi",         'bg-red-500/10 text-red-400 border border-red-500/20'],
+        'blocked'     => ['Bloklangan',      'bg-orange-500/10 text-orange-400 border border-orange-500/20'],
     ];
     $d = $map[$status] ?? $map['not_started'];
     return '<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium ' . $d[1] . '">' . $d[0] . '</span>';
@@ -39,6 +67,10 @@ function statusIcon($status)
     switch ($status) {
         case 'passed':
             return '<svg class="w-4 h-4 text-emerald-400" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>';
+        case 'blocked':
+            return '<svg class="w-4 h-4 text-orange-400" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd"/></svg>';
+        case 'failed':
+            return '<div class="w-2.5 h-2.5 rounded-full bg-red-400"></div>';
         case 'in_progress':
         case 'test_ready':
             return '<div class="w-2.5 h-2.5 rounded-full bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.5)]"></div>';

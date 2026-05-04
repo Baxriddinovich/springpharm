@@ -128,6 +128,7 @@ function updateMaterialProgress(viewed, total) {
 // TEST LOGIC
 // ═══════════════════════════════════════════════════════
 function selectOption(radio) {
+    // Legacy — yangi test.php da selectAnswer ishlatiladi
     const questionId = radio.name.match(/\d+/)[0];
     document.querySelectorAll('.radio-option[data-question="' + questionId + '"]').forEach(opt => opt.classList.remove('selected'));
     radio.closest('.radio-option').classList.add('selected');
@@ -135,7 +136,7 @@ function selectOption(radio) {
 }
 
 function updateAnswerCount() {
-    const total = document.querySelectorAll('input[type="radio"]:checked').length;
+    const total  = document.querySelectorAll('input[type="radio"]:checked').length;
     const qCount = new Set(Array.from(document.querySelectorAll('input[type="radio"]')).map(i => i.name)).size;
     const el = document.getElementById('answerCount');
     if (el) el.textContent = total + ' / ' + qCount + ' savolga javob berildi';
@@ -155,7 +156,7 @@ async function submitTest(e, moduleId) {
 
 async function doSubmitTest(moduleId) {
     const btn = document.getElementById('submitTestBtn');
-    btn.disabled = true;
+    if (btn) { btn.disabled = true; btn.innerHTML = '<svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg> Yuklanmoqda...'; }
     try {
         const formData = new FormData();
         formData.append('action', 'submit_test');
@@ -163,10 +164,18 @@ async function doSubmitTest(moduleId) {
         document.querySelectorAll('input[type="radio"]:checked').forEach(r => {
             formData.append('answers[' + r.name.match(/\d+/)[0] + ']', r.value);
         });
-        const res = await fetch(window.location.href, { method: 'POST', body: formData });
+        const res  = await fetch(window.location.href, { method: 'POST', body: formData });
         const data = await res.json();
-        if (data.success && data.redirect) window.location.href = data.redirect;
-    } catch (err) { showToast('Xatolik yuz berdi', 'error'); btn.disabled = false; }
+        if (data.success && data.redirect) {
+            window.location.href = data.redirect;
+        } else if (data.error === 'locked') {
+            showToast('Test hozir bloklangan!', 'error');
+            setTimeout(() => window.location.reload(), 1500);
+        }
+    } catch (err) {
+        showToast('Xatolik yuz berdi', 'error');
+        if (btn) { btn.disabled = false; btn.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg> Testni yakunlash'; }
+    }
 }
 
 function retakeTest(moduleId) {

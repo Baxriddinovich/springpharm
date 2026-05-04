@@ -1,8 +1,9 @@
 <?php
-$moduleStatus = getModuleStatus($moduleId);
-$canComplete = $allMaterialsViewed && !isset($_SESSION['reader_materials_completed'][$moduleId]);
+$moduleStatus    = getModuleStatus($moduleId);
+$canComplete     = $allMaterialsViewed && !isset($_SESSION['reader_materials_completed'][$moduleId]);
 $alreadyCompleted = isset($_SESSION['reader_materials_completed'][$moduleId]);
-$alreadyTested = isset($_SESSION['reader_test_results'][$moduleId]);
+// Test holati: o'tilgan, bloklangan yoki oddiy
+$alreadyTested   = !empty($testLockInfo['passed']) || !empty($testLockInfo['blocked']) || isset($_SESSION['reader_test_results'][$moduleId]);
 ?>
 <div class="p-4 md:p-8 fade-in">
     <div class="flex items-center gap-2 text-xs text-slate-500 mb-6">
@@ -36,10 +37,22 @@ $alreadyTested = isset($_SESSION['reader_test_results'][$moduleId]);
         </div>
 
         <?php if ($alreadyTested): ?>
+            <?php if (!empty($testLockInfo['passed'])): ?>
             <a href="?page=test_result&id=<?php echo $moduleId; ?>" class="btn-primary px-6 py-2.5 rounded-xl text-sm font-semibold text-white inline-flex items-center gap-2 whitespace-nowrap flex-shrink-0">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
                 Natijani ko'rish
             </a>
+            <?php elseif (!empty($testLockInfo['blocked'])): ?>
+            <a href="?page=test&id=<?php echo $moduleId; ?>" class="px-6 py-2.5 rounded-xl text-sm font-semibold text-orange-300 bg-orange-500/10 border border-orange-500/30 inline-flex items-center gap-2 whitespace-nowrap flex-shrink-0">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+                Bloklangan
+            </a>
+            <?php else: ?>
+            <a href="?page=test&id=<?php echo $moduleId; ?>" class="btn-primary px-6 py-2.5 rounded-xl text-sm font-semibold text-white inline-flex items-center gap-2 whitespace-nowrap flex-shrink-0">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                Testni boshlash
+            </a>
+            <?php endif; ?>
         <?php elseif ($alreadyCompleted): ?>
             <a href="?page=test&id=<?php echo $moduleId; ?>" class="btn-primary px-6 py-2.5 rounded-xl text-sm font-semibold text-white inline-flex items-center gap-2 whitespace-nowrap flex-shrink-0">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
