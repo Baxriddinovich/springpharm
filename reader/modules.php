@@ -509,14 +509,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <svg class="w-3.5 h-3.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>
                     Bu modul uchun hali test topshirilmagan.
                 </div>
-                <div class="flex gap-2">
-                    <button onclick="closePdfModal()" class="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 py-2.5 rounded-lg text-sm transition">
-                        Bekor qilish
-                    </button>
-                    <button onclick="openPdf()" id="pdfOpenBtn"
-                        class="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white py-2.5 rounded-lg text-sm font-semibold transition flex items-center justify-center gap-2">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
-                        PDF Ochish
+                <div class="space-y-2">
+                    <div class="flex gap-2">
+                        <button onclick="closePdfModal()" class="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 py-2.5 rounded-lg text-sm transition">
+                            Bekor qilish
+                        </button>
+                        <button onclick="openPdf()" id="pdfOpenBtn"
+                            class="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white py-2.5 rounded-lg text-sm font-semibold transition flex items-center justify-center gap-2">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+                            Tanlangan xodim PDF
+                        </button>
+                    </div>
+                    <button onclick="openAllPdf()" id="pdfAllBtn"
+                        class="w-full bg-cyan-700 hover:bg-cyan-600 text-white py-2.5 rounded-lg text-sm font-semibold transition flex items-center justify-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                        Barcha xodimlar PDF (umumiy)
                     </button>
                 </div>
             </div>
@@ -653,6 +660,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!userId) { alert('Iltimos, xodimni tanlang!'); return; }
             if (!currentPdfModuleId) return;
             window.open('module_pdf.php?module_id=' + currentPdfModuleId + '&user_id=' + userId, '_blank');
+            closePdfModal();
+        }
+
+        function openAllPdf() {
+            if (!currentPdfModuleId) return;
+            window.open('module_pdf.php?module_id=' + currentPdfModuleId + '&user_id=0', '_blank');
             closePdfModal();
         }
 
