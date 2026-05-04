@@ -208,15 +208,52 @@ $isPassed  = !empty($testLockInfo['passed']);
 </style>
 
 <script>
-let timerSeconds = 0;
-let timerInterval = setInterval(() => {
-    timerSeconds++;
-    const m = Math.floor(timerSeconds / 60).toString().padStart(2, '0');
-    const s = (timerSeconds % 60).toString().padStart(2, '0');
-    const el = document.getElementById('timerText');
-    if (el) el.textContent = m + ':' + s;
-}, 1000);
+// Har bir modul + foydalanuvchi uchun alohida kalit
+const TIMER_KEY = 'test_timer_<?php echo $moduleId; ?>_<?php echo $userId; ?>';
+const totalSeconds = <?php echo max(1, intval($currentModule['test_duration'] ?? 30)) * 60; ?>;
+
+// Boshlanish vaqtini localStorage dan olish yoki yangi yozish
+let startTime = localStorage.getItem(TIMER_KEY);
+if (!startTime) {
+    startTime = Date.now();
+    localStorage.setItem(TIMER_KEY, startTime);
+} else {
+    startTime = parseInt(startTime);
+}
+
+const timerEl = document.getElementById('timerText');
+
+function getRemainingSeconds() {
+    const elapsed = Math.floor((Date.now() - startTime) / 1000);
+    return Math.max(0, totalSeconds - elapsed);
+}
+
+function updateTimer() {
+    const remaining = getRemainingSeconds();
+    const m = Math.floor(remaining / 60).toString().padStart(2, '0');
+    const s = (remaining % 60).toString().padStart(2, '0');
+    if (timerEl) {
+        timerEl.textContent = m + ':' + s;
+        if (remaining <= 60) {
+            timerEl.classList.add('text-red-400');
+            timerEl.classList.remove('text-white');
+        } else {
+            timerEl.classList.remove('text-red-400');
+            timerEl.classList.add('text-white');
+        }
+    }
+    if (remaining <= 0) {
+        clearInterval(timerInterval);
+        localStorage.removeItem(TIMER_KEY);
+        doSubmitTest(<?php echo $moduleId; ?>);
+    }
+}
+
+updateTimer();
+let timerInterval = setInterval(updateTimer, 1000);
+
 window.onbeforeunload = () => clearInterval(timerInterval);
+</script>
 
 let answeredCount = 0;
 const totalQuestions = <?php echo count($testQuestions); ?>;

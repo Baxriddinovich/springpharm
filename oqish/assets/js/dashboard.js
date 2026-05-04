@@ -167,6 +167,13 @@ async function doSubmitTest(moduleId) {
         const res  = await fetch(window.location.href, { method: 'POST', body: formData });
         const data = await res.json();
         if (data.success && data.redirect) {
+            // Timer localStorage ni tozalash
+            const userId = document.body.dataset.userId || '';
+            localStorage.removeItem('test_timer_' + moduleId + '_' + userId);
+            // Barcha shu modul bilan bog'liq timer kalitlarini tozalash
+            Object.keys(localStorage).forEach(k => {
+                if (k.startsWith('test_timer_' + moduleId + '_')) localStorage.removeItem(k);
+            });
             window.location.href = data.redirect;
         } else if (data.error === 'locked') {
             showToast('Test hozir bloklangan!', 'error');

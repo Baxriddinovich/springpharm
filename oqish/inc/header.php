@@ -14,7 +14,7 @@ if (!isset($_SESSION['reader_user_id'])) {
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="assets/css/dashboard.css">
 </head>
-<body class="min-h-screen overflow-x-hidden">
+<body class="min-h-screen overflow-x-hidden" data-user-id="<?php echo intval($_SESSION['reader_user_id']); ?>">
     <!-- SIDEBAR OVERLAY (MOBILE) -->
     <div id="sidebarOverlay" class="fixed inset-0 bg-black/60 z-40 hidden lg:hidden" onclick="toggleSidebar()"></div>
     
