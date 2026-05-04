@@ -1,22 +1,8 @@
 <?php
-// Materiallar bor va tugatilmagan bo'lsa — modul sahifasiga qaytarish
-if (count($moduleMaterials) > 0 && !isset($_SESSION['reader_materials_completed'][$moduleId])) {
-    header("Location: ?page=module&id=$moduleId");
-    exit;
-}
-// Materiallar yo'q bo'lsa — avtomatik completed
-if (count($moduleMaterials) === 0 && !isset($_SESSION['reader_materials_completed'][$moduleId])) {
-    $_SESSION['reader_materials_completed'][$moduleId] = true;
-}
-
-// Test bloklangan yoki o'tilganmi?
+// Redirect logikasi dashboard.php da bajarilgan (include dan oldin)
+// Bu yerda faqat blok holati tekshiriladi
 $isBlocked = !empty($testLockInfo['blocked']);
 $isPassed  = !empty($testLockInfo['passed']);
-
-if ($isPassed) {
-    header("Location: ?page=test_result&id=$moduleId");
-    exit;
-}
 ?>
 <div class="p-4 md:p-8 fade-in">
     <!-- Breadcrumb -->

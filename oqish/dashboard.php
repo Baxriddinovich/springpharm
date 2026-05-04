@@ -423,6 +423,28 @@ if ($validModule) {
         }
     }
 
+    // Test sahifasi uchun oldindan redirect tekshiruvi (header() include dan oldin bo'lishi kerak)
+    if ($page === 'test') {
+        // Materiallar bor va tugatilmagan bo'lsa
+        if (count($moduleMaterials) > 0 && !isset($_SESSION['reader_materials_completed'][$moduleId])) {
+            header("Location: ?page=module&id=$moduleId");
+            exit;
+        }
+        // Materiallar yo'q — avtomatik completed
+        if (count($moduleMaterials) === 0 && !isset($_SESSION['reader_materials_completed'][$moduleId])) {
+            $_SESSION['reader_materials_completed'][$moduleId] = true;
+            try {
+                $pdo->prepare("INSERT IGNORE INTO reader_module_completions (user_id, module_id) VALUES (?,?)")
+                    ->execute([$userId, $moduleId]);
+            } catch (Exception $e) {}
+        }
+        // O'tilgan bo'lsa — natijaga yo'naltirish
+        if (!empty($testLockInfo['passed'])) {
+            header("Location: ?page=test_result&id=$moduleId");
+            exit;
+        }
+    }
+
     // Test savollarini yuklash
     if (in_array($page, ['test', 'test_result'])) {
         $qLimit      = intval($currentModule['test_question_count'] ?? 0);
