@@ -94,11 +94,22 @@ $alreadyTested = isset($_SESSION['reader_test_results'][$moduleId]);
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
             <?php foreach ($moduleMaterials as $idx => $mat):
                 $isViewed = in_array($mat['id'], $_SESSION['reader_materials_viewed'][$moduleId] ?? []);
-                $iconColor = fileIconClass($mat['file_type']);
+                // file_type maydoni bo'lmasa, file_name dan aniqlaymiz
+                $fileType = $mat['file_type'] ?? '';
+                if (empty($fileType)) {
+                    $ext = strtolower(pathinfo($mat['file_name'], PATHINFO_EXTENSION));
+                    $extMap = ['pdf' => 'application/pdf', 'mp4' => 'video/mp4', 'mov' => 'video/mp4',
+                               'jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg', 'png' => 'image/png',
+                               'gif' => 'image/gif', 'docx' => 'application/word', 'doc' => 'application/word',
+                               'pptx' => 'application/presentation', 'ppt' => 'application/presentation'];
+                    $fileType = $extMap[$ext] ?? 'application/octet-stream';
+                }
+                $iconColor = fileIconClass($fileType);
                 ?>
-                <div class="material-card glass-card rounded-2xl p-5 flex items-center gap-5 <?php echo $isViewed ? 'border-emerald-500/30 bg-emerald-500/5' : 'border-slate-700/50'; ?> fade-in cursor-pointer"
+        <div class="material-card glass-card rounded-2xl p-5 flex items-center gap-5 <?php echo $isViewed ? 'border-emerald-500/30 bg-emerald-500/5' : 'border-slate-700/50'; ?> fade-in cursor-pointer"
                     style="animation-delay: <?php echo $idx * 0.05; ?>s"
-                    onclick="openMaterial('?serve_file=<?php echo urlencode($mat['file_path']); ?>', '<?php echo addslashes($mat['file_name']); ?>', '<?php echo $mat['file_type']; ?>', <?php echo $mat['id']; ?>, <?php echo $moduleId; ?>)">
+                    data-material-id="<?php echo $mat['id']; ?>"
+                    onclick="openMaterial('?serve_file=<?php echo urlencode($mat['file_path']); ?>', '<?php echo addslashes($mat['file_name']); ?>', '<?php echo $fileType; ?>', <?php echo $mat['id']; ?>, <?php echo $moduleId; ?>)">
 
                     <div class="material-icon-box flex-shrink-0 w-14 h-14 rounded-2xl bg-slate-800/50 flex items-center justify-center border border-slate-700/50">
                         <svg class="w-7 h-7 <?php echo $iconColor; ?>" fill="none" stroke="currentColor" viewBox="0 0 24 24">

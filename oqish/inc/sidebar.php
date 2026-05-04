@@ -51,7 +51,7 @@
         <?php endif; ?>
     </nav>
     <div class="px-3 py-4 border-t border-slate-800/50">
-        <a href="?action=logout" class="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-red-500/10 transition group">
+        <a href="logout.php" class="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-red-500/10 transition group">
             <svg class="w-[18px] h-[18px] text-slate-500 group-hover:text-red-400 transition" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
             </svg>

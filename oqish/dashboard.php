@@ -95,7 +95,7 @@ if ($userPositionId) {
     $stmt = $pdo->prepare("
         SELECT tm.*,
             (SELECT COUNT(*) FROM module_materials mm WHERE mm.module_id = tm.id AND mm.file_path IS NOT NULL AND mm.file_path != '') as material_count,
-            (SELECT COUNT(*) FROM test_questions tq WHERE tq.module_id = tm.id) as question_count
+            (SELECT COUNT(*) FROM training_questions tq WHERE tq.training_id = tm.id) as question_count
         FROM training_modules tm
         INNER JOIN training_matrix tx ON tm.id = tx.module_id
         WHERE tx.position_id = ? AND tm.status = 'active'
@@ -130,16 +130,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 logActivity('material_viewed', "Material (ID: $matId) ko'rildi", 'oqish');
             }
 
-            $totalMats = 0;
-            foreach ($assignedModules as $m) {
-                if ($m['id'] == $modId) {
-                    $totalMats = $m['material_count'];
-                    break;
-                }
-            }
+            // Jami materiallar sonini bazadan olamiz (ishonchli)
+            $totalStmt = $pdo->prepare("SELECT COUNT(*) FROM module_materials WHERE module_id = ? AND file_path IS NOT NULL AND file_path != ''");
+            $totalStmt->execute([$modId]);
+            $totalMats = (int)$totalStmt->fetchColumn();
+
             $viewedCount = count($_SESSION['reader_materials_viewed'][$modId]);
 
-            $response = ['success' => true, 'viewed' => $viewedCount, 'total' => $totalMats, 'all_viewed' => ($viewedCount >= $totalMats)];
+            $response = ['success' => true, 'viewed' => $viewedCount, 'total' => $totalMats, 'all_viewed' => ($viewedCount >= $totalMats && $totalMats > 0)];
         }
     }
 
@@ -156,19 +154,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $modId = intval($_POST['module_id'] ?? 0);
         $answers = $_POST['answers'] ?? [];
 
-        $stmt = $pdo->prepare("SELECT tq.id, tq.question_text, ta.id as ans_id, ta.answer_text, ta.is_correct FROM test_questions tq LEFT JOIN test_answers ta ON tq.id = ta.question_id WHERE tq.module_id = ? ORDER BY tq.order_index");
+        // training_questions jadvalidan o'qish
+        $stmt = $pdo->prepare("SELECT id, question_text, option_a, option_b, option_c, option_d, correct_option 
+                               FROM training_questions 
+                               WHERE training_id = ? 
+                               ORDER BY id ASC");
         $stmt->execute([$modId]);
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
         $questions = [];
         foreach ($rows as $r) {
-            if (!isset($questions[$r['id']]))
-                $questions[$r['id']] = ['text' => $r['question_text'], 'correct_id' => null, 'answers' => []];
-            if ($r['ans_id']) {
-                $questions[$r['id']]['answers'][$r['ans_id']] = $r['answer_text'];
-                if ($r['is_correct'])
-                    $questions[$r['id']]['correct_id'] = $r['ans_id'];
-            }
+            $base = $r['id'] * 10;
+            $optionMap = [
+                'a' => ['id' => $base + 1, 'text' => $r['option_a']],
+                'b' => ['id' => $base + 2, 'text' => $r['option_b']],
+                'c' => ['id' => $base + 3, 'text' => $r['option_c']],
+                'd' => ['id' => $base + 4, 'text' => $r['option_d']],
+            ];
+            $questions[$r['id']] = [
+                'text'       => $r['question_text'],
+                'correct_id' => $optionMap[$r['correct_option']]['id'] ?? null,
+                'answers'    => $optionMap,
+            ];
         }
 
         $correct = 0;
@@ -178,7 +185,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $isCorrect = ($selected == $q['correct_id']);
             if ($isCorrect)
                 $correct++;
-            $details[] = ['question' => $q['text'], 'selected' => $selected, 'correct_id' => $q['correct_id'], 'is_correct' => $isCorrect, 'answers' => $q['answers']];
+            // answers massivini id => text formatiga o'tkazamiz
+            $answersFlat = [];
+            foreach ($q['answers'] as $opt) {
+                $answersFlat[$opt['id']] = $opt['text'];
+            }
+            $details[] = [
+                'question'   => $q['text'],
+                'selected'   => $selected,
+                'correct_id' => $q['correct_id'],
+                'is_correct' => $isCorrect,
+                'answers'    => $answersFlat,
+            ];
         }
 
         $score = count($questions) > 0 ? round(($correct / count($questions)) * 100, 1) : 0;
@@ -187,13 +205,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $passing = $stmt->fetchColumn() ?: 80;
 
         $_SESSION['reader_test_results'][$modId] = [
-            'score' => $score,
+            'score'   => $score,
             'correct' => $correct,
-            'total' => count($questions),
-            'status' => ($score >= $passing ? 'passed' : 'failed'),
+            'total'   => count($questions),
+            'status'  => ($score >= $passing ? 'passed' : 'failed'),
             'passing' => $passing,
-            'time' => date('d.m.Y H:i'),
-            'details' => $details
+            'time'    => date('d.m.Y H:i'),
+            'details' => $details,
         ];
 
         $status = ($score >= $passing ? 'o\'tdi' : 'o\'ta olmadi');
@@ -232,21 +250,28 @@ if ($validModule) {
     $stmt->execute([$moduleId]);
     $moduleMaterials = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-    // Load questions for test and result pages
+    // Load questions for test and result pages (training_questions jadvalidan)
     if (in_array($page, ['test', 'test_result'])) {
         try {
-            // Removed ORDER BY order_index just in case it doesn't exist
-            $stmt = $pdo->prepare("SELECT tq.id, tq.question_text, ta.id as ans_id, ta.answer_text, ta.is_correct 
-                                   FROM test_questions tq 
-                                   LEFT JOIN test_answers ta ON tq.id = ta.question_id 
-                                   WHERE tq.module_id = ?");
+            $stmt = $pdo->prepare("SELECT id, question_text, option_a, option_b, option_c, option_d, correct_option 
+                                   FROM training_questions 
+                                   WHERE training_id = ? 
+                                   ORDER BY id ASC");
             $stmt->execute([$moduleId]);
             $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
             foreach ($rows as $r) {
-                if (!isset($testQuestions[$r['id']]))
-                    $testQuestions[$r['id']] = ['text' => $r['question_text'], 'answers' => []];
-                if ($r['ans_id'])
-                    $testQuestions[$r['id']]['answers'][] = ['id' => $r['ans_id'], 'text' => $r['answer_text']];
+                $base = $r['id'] * 10;
+                $optionMap = [
+                    'a' => ['id' => $base + 1, 'text' => $r['option_a']],
+                    'b' => ['id' => $base + 2, 'text' => $r['option_b']],
+                    'c' => ['id' => $base + 3, 'text' => $r['option_c']],
+                    'd' => ['id' => $base + 4, 'text' => $r['option_d']],
+                ];
+                $testQuestions[$r['id']] = [
+                    'text'       => $r['question_text'],
+                    'correct_id' => $optionMap[$r['correct_option']]['id'] ?? null,
+                    'answers'    => array_values($optionMap),
+                ];
             }
         } catch (Exception $e) {
             // Silently fail or log

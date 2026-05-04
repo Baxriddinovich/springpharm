@@ -80,24 +80,21 @@ async function markAsViewed(materialId, moduleId) {
         if (data.success) {
             updateMaterialProgress(data.viewed, data.total);
             
-            // Mark the specific card as viewed in UI
-            const cards = document.querySelectorAll('.material-card');
-            cards.forEach(card => {
-                if (card.getAttribute('onclick') && card.getAttribute('onclick').includes(materialId)) {
-                    card.classList.remove('border-slate-700/50');
-                    card.classList.add('border-emerald-500/30', 'bg-emerald-500/5');
-                    const statusText = card.querySelector('.text-slate-500');
-                    if (statusText && statusText.textContent === "O'qilmagan") {
-                        statusText.textContent = "Ko'rildi";
-                        statusText.classList.remove('text-slate-500');
-                        statusText.classList.add('text-emerald-400');
-                    }
+            // Mark the specific card as viewed in UI using data-material-id
+            const card = document.querySelector('.material-card[data-material-id="' + materialId + '"]');
+            if (card) {
+                card.classList.remove('border-slate-700/50');
+                card.classList.add('border-emerald-500/30', 'bg-emerald-500/5');
+                const statusSpan = card.querySelector('.text-slate-500');
+                if (statusSpan && statusSpan.textContent.trim() === "O'qilmagan") {
+                    statusSpan.outerHTML = '<span class="flex items-center gap-1 text-[11px] font-medium text-emerald-400">'
+                        + '<svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" /></svg>'
+                        + "Ko'rildi</span>";
                 }
-            });
+            }
 
             if (data.all_viewed) {
                 showToast('Barcha materiallar ko\'rildi! "Tugatish" tugmasini bosing.', 'success');
-                // Optional: Show the complete button if it was hidden
                 const completeBtn = document.querySelector('button[onclick*="completeMaterials"]');
                 if (completeBtn) completeBtn.classList.remove('hidden');
             }

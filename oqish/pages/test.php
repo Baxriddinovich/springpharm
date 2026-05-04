@@ -1,7 +1,12 @@
 <?php
-if (!isset($_SESSION['reader_materials_completed'][$moduleId]) && count($moduleMaterials) > 0) {
+// Materiallar bor va ko'rilmagan bo'lsa — modul sahifasiga qaytarish
+if (count($moduleMaterials) > 0 && !isset($_SESSION['reader_materials_completed'][$moduleId])) {
     header("Location: ?page=module&id=$moduleId");
     exit;
+}
+// Materiallar yo'q bo'lsa — avtomatik completed deb belgilash
+if (count($moduleMaterials) === 0 && !isset($_SESSION['reader_materials_completed'][$moduleId])) {
+    $_SESSION['reader_materials_completed'][$moduleId] = true;
 }
 if (isset($_SESSION['reader_test_results'][$moduleId])) {
     header("Location: ?page=test_result&id=$moduleId");
