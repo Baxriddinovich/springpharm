@@ -253,22 +253,17 @@ updateTimer();
 let timerInterval = setInterval(updateTimer, 1000);
 
 window.onbeforeunload = () => clearInterval(timerInterval);
-</script>
 
+// ── PROGRESS & ANSWER SELECTION ──
 let answeredCount = 0;
 const totalQuestions = <?php echo count($testQuestions); ?>;
 
 function selectAnswer(radio, questionId, total) {
-    // Eski selected ni olib tashlash
     document.querySelectorAll(`.answer-option[data-question="${questionId}"]`).forEach(opt => {
         opt.classList.remove('selected');
     });
-
-    // Yangi tanlangan
     const label = radio.closest('.answer-option');
     label.classList.add('selected');
-
-    // Question card ni answered qilish
     const card = document.getElementById('qcard_' + questionId);
     if (card && !card.classList.contains('answered')) {
         card.classList.add('answered');
