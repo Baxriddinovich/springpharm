@@ -14,13 +14,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if (!empty($name)) {
         if ($pos_id) {
-            // Update
             $stmt = $pdo->prepare("UPDATE positions SET name=? WHERE id=?");
             $stmt->execute([$name, $pos_id]);
+            logActivity('position_edited', "Lavozim tahrirlandi: $name (ID: $pos_id)", 'positions');
         } else {
-            // Insert
             $stmt = $pdo->prepare("INSERT INTO positions (name) VALUES (?)");
             $stmt->execute([$name]);
+            logActivity('position_added', "Yangi lavozim qo'shildi: $name", 'positions');
         }
     }
     header("Location: positions.php");
@@ -32,15 +32,15 @@ if (isset($_GET['delete'])) {
     $id = (int)$_GET['delete'];
     
     // Xavfsizlik: Lavozimda xodimlar borligini tekshiramiz
-    $check = $pdo->prepare("SELECT COUNT(*) FROM employees WHERE position_id = ?");
+    $check = $pdo->prepare("SELECT COUNT(*) FROM users WHERE position_id = ? AND role='reader'");
     $check->execute([$id]);
     $count = $check->fetchColumn();
 
     if ($count > 0) {
-        // Xodimlar bo'lsa, o'chirmaymiz
         echo "<script>alert('Diqqat: Ushbu lavozimda xodimlar mavjud. Avval xodimlarni boshqa lavozimga o\'tkazishingiz kerak.');</script>";
     } else {
         $pdo->prepare("DELETE FROM positions WHERE id=?")->execute([$id]);
+        logActivity('position_deleted', "Lavozim o'chirildi (ID: $id)", 'positions');
         header("Location: positions.php");
         exit;
     }
@@ -128,10 +128,9 @@ if (isset($_GET['delete'])) {
                                     <?php echo htmlspecialchars($pos['name']); ?>
                                 </div>
                             </td>
-                            <!-- Xodimlar soni -->
                             <td class="px-6 py-4 text-center text-slate-400">
                                 <?php 
-                                    $empCount = $pdo->prepare("SELECT COUNT(*) FROM employees WHERE position_id = ?");
+                                    $empCount = $pdo->prepare("SELECT COUNT(*) FROM users WHERE position_id = ? AND role='reader' AND is_active=1");
                                     $empCount->execute([$pos['id']]);
                                     echo $empCount->fetchColumn();
                                 ?>
