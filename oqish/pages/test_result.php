@@ -78,8 +78,7 @@ $ringColor = $isPassed ? '#10b981' : '#ef4444';
     <?php if (!$isPassed): ?>
         <div class="text-center mb-8 space-y-3">
             <?php
-            // Blok vaqtini hisoblash
-            global $testLockInfo;
+            // testLockInfo dashboard.php dan keladi (include scope)
             $isNowBlocked = !empty($testLockInfo['blocked']);
             ?>
             <?php if ($isNowBlocked): ?>
@@ -101,6 +100,8 @@ $ringColor = $isPassed ? '#10b981' : '#ef4444';
                 Materiallarni qayta o'qish
             </a>
         </div>
+
+    <?php endif; ?>
 
     <?php if (!empty($testResult['details'])): ?>
         <h2 class="text-base font-semibold text-white mb-4 flex items-center gap-2">
