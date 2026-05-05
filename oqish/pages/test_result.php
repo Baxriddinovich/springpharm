@@ -76,16 +76,31 @@ $ringColor = $isPassed ? '#10b981' : '#ef4444';
     </div>
 
     <?php if (!$isPassed): ?>
-        <div class="text-center mb-8">
-            <button onclick="retakeTest(<?php echo $moduleId; ?>)"
+        <div class="text-center mb-8 space-y-3">
+            <?php
+            // testLockInfo dashboard.php dan keladi (include scope)
+            $isNowBlocked = !empty($testLockInfo['blocked']);
+            ?>
+            <?php if ($isNowBlocked): ?>
+            <div class="glass-card rounded-xl p-4 max-w-sm mx-auto border-orange-500/20 mb-4">
+                <div class="flex items-center gap-3">
+                    <svg class="w-5 h-5 text-orange-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+                    <div class="text-left">
+                        <p class="text-sm font-semibold text-orange-300">Test bloklangan</p>
+                        <p class="text-xs text-slate-400">Keyingi urinish: <?php echo date('d.m.Y H:i', strtotime($testLockInfo['next_at'])); ?></p>
+                    </div>
+                </div>
+            </div>
+            <?php endif; ?>
+            <a href="?page=module&id=<?php echo $moduleId; ?>"
                 class="btn-primary px-8 py-3 rounded-xl text-sm font-semibold text-white inline-flex items-center gap-2">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
                 </svg>
-                Qayta topshirish
-            </button>
+                Materiallarni qayta o'qish
+            </a>
         </div>
+
     <?php endif; ?>
 
     <?php if (!empty($testResult['details'])): ?>

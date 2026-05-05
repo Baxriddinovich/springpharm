@@ -52,8 +52,7 @@ if (isset($_GET['serve_file'])) {
         header("Content-Type: $mimeType");
         header("Content-Disposition: inline; filename=\"" . basename($foundPath) . "\"");
         header("Content-Length: " . filesize($foundPath));
-        if (ob_get_level())
-            ob_end_clean();
+        if (ob_get_level()) ob_end_clean();
         readfile($foundPath);
         exit;
     }
@@ -69,25 +68,110 @@ if (!isset($_SESSION['reader_user_id'])) {
     exit;
 }
 
-$userId = $_SESSION['reader_user_id'];
+$userId   = $_SESSION['reader_user_id'];
 $fullName = $_SESSION['reader_full_name'] ?? '';
 $username = $_SESSION['reader_username'] ?? '';
 
-// Session tracking initialization
-if (!isset($_SESSION['reader_materials_viewed']))
-    $_SESSION['reader_materials_viewed'] = [];
-if (!isset($_SESSION['reader_materials_completed']))
-    $_SESSION['reader_materials_completed'] = [];
-if (!isset($_SESSION['reader_test_results']))
-    $_SESSION['reader_test_results'] = [];
+// Session tracking (fallback uchun saqlanadi)
+if (!isset($_SESSION['reader_materials_viewed']))    $_SESSION['reader_materials_viewed']    = [];
+if (!isset($_SESSION['reader_materials_completed'])) $_SESSION['reader_materials_completed'] = [];
+if (!isset($_SESSION['reader_test_results']))        $_SESSION['reader_test_results']        = [];
+
+// ═══════════════════════════════════════════════════════════
+// DB HELPER FUNKSIYALAR
+// ═══════════════════════════════════════════════════════════
+
+/** Foydalanuvchi uchun modul materiallarini ko'rganlarini DB dan olish */
+function getViewedMaterials(PDO $pdo, int $userId, int $moduleId): array {
+    try {
+        $s = $pdo->prepare("SELECT material_id FROM reader_material_progress WHERE user_id=? AND module_id=?");
+        $s->execute([$userId, $moduleId]);
+        return $s->fetchAll(PDO::FETCH_COLUMN);
+    } catch (Exception $e) { return []; }
+}
+
+/** Modul tugatilganmi (materiallar o'qildi tugmasi bosilganmi) */
+function isModuleCompleted(PDO $pdo, int $userId, int $moduleId): bool {
+    try {
+        $s = $pdo->prepare("SELECT id FROM reader_module_completions WHERE user_id=? AND module_id=?");
+        $s->execute([$userId, $moduleId]);
+        return (bool)$s->fetchColumn();
+    } catch (Exception $e) { return false; }
+}
+
+/** Oxirgi test urinishini olish */
+function getLastAttempt(PDO $pdo, int $userId, int $moduleId): ?array {
+    try {
+        $s = $pdo->prepare("SELECT * FROM reader_test_attempts WHERE user_id=? AND module_id=? ORDER BY attempted_at DESC LIMIT 1");
+        $s->execute([$userId, $moduleId]);
+        $r = $s->fetch(PDO::FETCH_ASSOC);
+        return $r ?: null;
+    } catch (Exception $e) { return null; }
+}
+
+/** Test hozir ochiqmi (3 kunlik blok tekshiruvi) */
+function isTestUnlocked(PDO $pdo, int $userId, int $moduleId): array {
+    $attempt = getLastAttempt($pdo, $userId, $moduleId);
+    if (!$attempt) return ['unlocked' => true, 'attempt' => null];
+    if ($attempt['status'] === 'passed') return ['unlocked' => false, 'passed' => true, 'attempt' => $attempt];
+    // Muvaffaqiyatsiz — next_allowed_at tekshirish
+    if ($attempt['next_allowed_at']) {
+        $now  = new DateTime();
+        $next = new DateTime($attempt['next_allowed_at']);
+        if ($now < $next) {
+            return ['unlocked' => false, 'blocked' => true, 'next_at' => $attempt['next_allowed_at'], 'attempt' => $attempt];
+        }
+    }
+    return ['unlocked' => true, 'attempt' => $attempt];
+}
+
+/** Modul uchun test savollarini random yuklash */
+function loadTestQuestions(PDO $pdo, int $moduleId, int $limit = 0): array {
+    try {
+        $s = $pdo->prepare("SELECT id, question_text, option_a, option_b, option_c, option_d, correct_option FROM training_questions WHERE training_id=? ORDER BY id ASC");
+        $s->execute([$moduleId]);
+        $rows = $s->fetchAll(PDO::FETCH_ASSOC);
+
+        // Random tartib
+        shuffle($rows);
+
+        // Limit qo'llash
+        if ($limit > 0 && $limit < count($rows)) {
+            $rows = array_slice($rows, 0, $limit);
+        }
+
+        $questions = [];
+        foreach ($rows as $r) {
+            $base = $r['id'] * 10;
+            $opts = [
+                ['id' => $base + 1, 'text' => $r['option_a'], 'key' => 'a'],
+                ['id' => $base + 2, 'text' => $r['option_b'], 'key' => 'b'],
+                ['id' => $base + 3, 'text' => $r['option_c'], 'key' => 'c'],
+                ['id' => $base + 4, 'text' => $r['option_d'], 'key' => 'd'],
+            ];
+            // Variantlarni ham aralashtirish
+            shuffle($opts);
+            $correctId = null;
+            foreach ($opts as $o) {
+                if ($o['key'] === $r['correct_option']) { $correctId = $o['id']; break; }
+            }
+            $questions[$r['id']] = [
+                'text'       => $r['question_text'],
+                'correct_id' => $correctId,
+                'answers'    => $opts,
+            ];
+        }
+        return $questions;
+    } catch (Exception $e) { return []; }
+}
 
 // ═══════════════════════════════════════════════════════════
 // DATA LOADING
 // ═══════════════════════════════════════════════════════════
 $stmt = $pdo->prepare("SELECT u.position_id, p.name as position_name FROM users u LEFT JOIN positions p ON u.position_id = p.id WHERE u.id = ?");
 $stmt->execute([$userId]);
-$userData = $stmt->fetch(PDO::FETCH_ASSOC);
-$userPositionId = $userData['position_id'] ?? null;
+$userData      = $stmt->fetch(PDO::FETCH_ASSOC);
+$userPositionId   = $userData['position_id'] ?? null;
 $userPositionName = $userData['position_name'] ?? 'Belgilanmagan';
 
 $assignedModules = [];
@@ -95,7 +179,7 @@ if ($userPositionId) {
     $stmt = $pdo->prepare("
         SELECT tm.*,
             (SELECT COUNT(*) FROM module_materials mm WHERE mm.module_id = tm.id AND mm.file_path IS NOT NULL AND mm.file_path != '') as material_count,
-            (SELECT COUNT(*) FROM test_questions tq WHERE tq.module_id = tm.id) as question_count
+            (SELECT COUNT(*) FROM training_questions tq WHERE tq.training_id = tm.id) as question_count
         FROM training_modules tm
         INNER JOIN training_matrix tx ON tm.id = tx.module_id
         WHERE tx.position_id = ? AND tm.status = 'active'
@@ -105,99 +189,166 @@ if ($userPositionId) {
     $assignedModules = $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
 
-// Page parameters
-$page = $_GET['page'] ?? 'dashboard';
+$page     = $_GET['page'] ?? 'dashboard';
 $moduleId = intval($_GET['id'] ?? 0);
 
-if ($page === 'test' && isset($_GET['retake'])) {
-    unset($_SESSION['reader_test_results'][$moduleId]);
-}
-
-// AJAX actions
+// ═══════════════════════════════════════════════════════════
+// AJAX ACTIONS (POST)
+// ═══════════════════════════════════════════════════════════
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     header('Content-Type: application/json; charset=utf-8');
-    $action = $_POST['action'] ?? '';
+    $action   = $_POST['action'] ?? '';
     $response = ['success' => false];
 
+    // --- Material ko'rildi ---
     if ($action === 'mark_viewed') {
         $matId = intval($_POST['material_id'] ?? 0);
         $modId = intval($_POST['module_id'] ?? 0);
         if ($modId && $matId) {
-            if (!isset($_SESSION['reader_materials_viewed'][$modId]))
-                $_SESSION['reader_materials_viewed'][$modId] = [];
-            if (!in_array($matId, $_SESSION['reader_materials_viewed'][$modId])) {
-                $_SESSION['reader_materials_viewed'][$modId][] = $matId;
+            try {
+                $pdo->prepare("INSERT IGNORE INTO reader_material_progress (user_id, module_id, material_id) VALUES (?,?,?)")
+                    ->execute([$userId, $modId, $matId]);
                 logActivity('material_viewed', "Material (ID: $matId) ko'rildi", 'oqish');
-            }
+            } catch (Exception $e) {}
 
-            $totalMats = 0;
-            foreach ($assignedModules as $m) {
-                if ($m['id'] == $modId) {
-                    $totalMats = $m['material_count'];
-                    break;
-                }
-            }
-            $viewedCount = count($_SESSION['reader_materials_viewed'][$modId]);
+            // Session ham yangilash (fallback)
+            if (!isset($_SESSION['reader_materials_viewed'][$modId])) $_SESSION['reader_materials_viewed'][$modId] = [];
+            if (!in_array($matId, $_SESSION['reader_materials_viewed'][$modId])) $_SESSION['reader_materials_viewed'][$modId][] = $matId;
 
-            $response = ['success' => true, 'viewed' => $viewedCount, 'total' => $totalMats, 'all_viewed' => ($viewedCount >= $totalMats)];
+            $totalStmt = $pdo->prepare("SELECT COUNT(*) FROM module_materials WHERE module_id=? AND file_path IS NOT NULL AND file_path != ''");
+            $totalStmt->execute([$modId]);
+            $totalMats   = (int)$totalStmt->fetchColumn();
+            $viewedItems = getViewedMaterials($pdo, $userId, $modId);
+            $viewedCount = count($viewedItems);
+
+            $response = ['success' => true, 'viewed' => $viewedCount, 'total' => $totalMats, 'all_viewed' => ($viewedCount >= $totalMats && $totalMats > 0)];
         }
     }
 
+    // --- Materiallarni tugatish ---
     if ($action === 'complete_materials') {
         $modId = intval($_POST['module_id'] ?? 0);
         if ($modId) {
+            try {
+                $pdo->prepare("INSERT IGNORE INTO reader_module_completions (user_id, module_id) VALUES (?,?)")
+                    ->execute([$userId, $modId]);
+                logActivity('module_completed', "Modul (ID: $modId) o'qib tugatildi", 'oqish');
+            } catch (Exception $e) {}
             $_SESSION['reader_materials_completed'][$modId] = true;
-            logActivity('module_completed', "Modul (ID: $modId) o'qib tugatildi", 'oqish');
             $response = ['success' => true, 'redirect' => "?page=test&id=$modId"];
         }
     }
 
+    // --- Test topshirish ---
     if ($action === 'submit_test') {
-        $modId = intval($_POST['module_id'] ?? 0);
+        $modId   = intval($_POST['module_id'] ?? 0);
         $answers = $_POST['answers'] ?? [];
 
-        $stmt = $pdo->prepare("SELECT tq.id, tq.question_text, ta.id as ans_id, ta.answer_text, ta.is_correct FROM test_questions tq LEFT JOIN test_answers ta ON tq.id = ta.question_id WHERE tq.module_id = ? ORDER BY tq.order_index");
-        $stmt->execute([$modId]);
-        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        // Test ochiqmi tekshirish
+        $lockInfo = isTestUnlocked($pdo, $userId, $modId);
+        if (!$lockInfo['unlocked']) {
+            $response = ['success' => false, 'error' => 'locked'];
+            echo json_encode($response); exit;
+        }
 
-        $questions = [];
-        foreach ($rows as $r) {
-            if (!isset($questions[$r['id']]))
-                $questions[$r['id']] = ['text' => $r['question_text'], 'correct_id' => null, 'answers' => []];
-            if ($r['ans_id']) {
-                $questions[$r['id']]['answers'][$r['ans_id']] = $r['answer_text'];
-                if ($r['is_correct'])
-                    $questions[$r['id']]['correct_id'] = $r['ans_id'];
+        // Modul sozlamalarini olish
+        $modStmt = $pdo->prepare("SELECT passing_percent, test_question_count FROM training_modules WHERE id=?");
+        $modStmt->execute([$modId]);
+        $modInfo = $modStmt->fetch(PDO::FETCH_ASSOC);
+        $passing  = intval($modInfo['passing_percent'] ?? 80);
+        $qLimit   = intval($modInfo['test_question_count'] ?? 0);
+
+        // Savollarni yuklash (session da saqlangan bo'lishi kerak — test boshlanganda)
+        // Javoblarni tekshirish uchun DB dan o'qiymiz
+        $allQStmt = $pdo->prepare("SELECT id, correct_option FROM training_questions WHERE training_id=?");
+        $allQStmt->execute([$modId]);
+        $allQRows = $allQStmt->fetchAll(PDO::FETCH_ASSOC);
+
+        // correct_id ni hisoblash (base formula: id*10 + offset)
+        $correctMap = [];
+        foreach ($allQRows as $r) {
+            $base = $r['id'] * 10;
+            $offsets = ['a' => 1, 'b' => 2, 'c' => 3, 'd' => 4];
+            $correctMap[$r['id']] = $base + ($offsets[$r['correct_option']] ?? 1);
+        }
+
+        // Faqat topshirilgan savollarni hisoblash
+        $correct = 0;
+        $total   = count($answers);
+        $details = [];
+
+        // Savol matnlarini olish
+        $qTexts = [];
+        $qOptsStmt = $pdo->prepare("SELECT id, question_text, option_a, option_b, option_c, option_d, correct_option FROM training_questions WHERE training_id=?");
+        $qOptsStmt->execute([$modId]);
+        foreach ($qOptsStmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
+            $qTexts[$r['id']] = $r;
+        }
+
+        foreach ($answers as $qId => $selectedId) {
+            $qId       = intval($qId);
+            $selectedId = intval($selectedId);
+            $correctId  = $correctMap[$qId] ?? null;
+            $isCorrect  = ($selectedId === $correctId);
+            if ($isCorrect) $correct++;
+
+            $qRow = $qTexts[$qId] ?? null;
+            if ($qRow) {
+                $base = $qId * 10;
+                $answersFlat = [
+                    $base + 1 => $qRow['option_a'],
+                    $base + 2 => $qRow['option_b'],
+                    $base + 3 => $qRow['option_c'],
+                    $base + 4 => $qRow['option_d'],
+                ];
+                $details[] = [
+                    'question'   => $qRow['question_text'],
+                    'selected'   => $selectedId,
+                    'correct_id' => $correctId,
+                    'is_correct' => $isCorrect,
+                    'answers'    => $answersFlat,
+                ];
             }
         }
 
-        $correct = 0;
-        $details = [];
-        foreach ($questions as $qId => $q) {
-            $selected = intval($answers[$qId] ?? 0);
-            $isCorrect = ($selected == $q['correct_id']);
-            if ($isCorrect)
-                $correct++;
-            $details[] = ['question' => $q['text'], 'selected' => $selected, 'correct_id' => $q['correct_id'], 'is_correct' => $isCorrect, 'answers' => $q['answers']];
+        $score  = $total > 0 ? round(($correct / $total) * 100, 1) : 0;
+        $status = ($score >= $passing) ? 'passed' : 'failed';
+
+        // Keyingi urinish vaqtini hisoblash (muvaffaqiyatsiz bo'lsa 3 kun)
+        $nextAllowedAt = null;
+        if ($status === 'failed') {
+            $nextAllowedAt = date('Y-m-d H:i:s', strtotime('+3 days'));
         }
 
-        $score = count($questions) > 0 ? round(($correct / count($questions)) * 100, 1) : 0;
-        $stmt = $pdo->prepare("SELECT passing_percent FROM training_modules WHERE id = ?");
-        $stmt->execute([$modId]);
-        $passing = $stmt->fetchColumn() ?: 80;
+        // DB ga saqlash
+        try {
+            $pdo->prepare("INSERT INTO reader_test_attempts (user_id, module_id, score, correct_count, total_count, status, passing_percent, next_allowed_at, details) VALUES (?,?,?,?,?,?,?,?,?)")
+                ->execute([$userId, $modId, $score, $correct, $total, $status, $passing, $nextAllowedAt, json_encode($details)]);
+        } catch (Exception $e) {}
 
+        // Muvaffaqiyatsiz bo'lsa — materiallarni qayta o'qish uchun completion va viewed ni o'chirish
+        if ($status === 'failed') {
+            try {
+                $pdo->prepare("DELETE FROM reader_module_completions WHERE user_id=? AND module_id=?")->execute([$userId, $modId]);
+                $pdo->prepare("DELETE FROM reader_material_progress WHERE user_id=? AND module_id=?")->execute([$userId, $modId]);
+            } catch (Exception $e) {}
+            unset($_SESSION['reader_materials_completed'][$modId]);
+            unset($_SESSION['reader_materials_viewed'][$modId]);
+        }
+
+        // Session ga ham saqlash
         $_SESSION['reader_test_results'][$modId] = [
-            'score' => $score,
+            'score'   => $score,
             'correct' => $correct,
-            'total' => count($questions),
-            'status' => ($score >= $passing ? 'passed' : 'failed'),
+            'total'   => $total,
+            'status'  => $status,
             'passing' => $passing,
-            'time' => date('d.m.Y H:i'),
-            'details' => $details
+            'time'    => date('d.m.Y H:i'),
+            'details' => $details,
         ];
 
-        $status = ($score >= $passing ? 'o\'tdi' : 'o\'ta olmadi');
-        logActivity('test_submitted', "Test topshirildi (ID: $modId). Natija: $score%. Holati: $status", 'oqish');
+        $statusText = $status === 'passed' ? "o'tdi" : "o'ta olmadi";
+        logActivity('test_submitted', "Test topshirildi (ID: $modId). Natija: $score%. Holati: $statusText", 'oqish');
 
         $response = ['success' => true, 'redirect' => "?page=test_result&id=$modId"];
     }
@@ -206,13 +357,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     exit;
 }
 
-// Module validation
-$validModule = false;
+// ═══════════════════════════════════════════════════════════
+// MODULE VALIDATION
+// ═══════════════════════════════════════════════════════════
+$validModule   = false;
 $currentModule = null;
 if ($moduleId) {
     foreach ($assignedModules as $m) {
         if ($m['id'] == $moduleId) {
-            $validModule = true;
+            $validModule   = true;
             $currentModule = $m;
             break;
         }
@@ -220,59 +373,109 @@ if ($moduleId) {
 }
 
 $moduleMaterials = [];
-$testQuestions = [];
-if ($validModule) {
-    // REDIRECTION: If module is completed (Tugatish pressed), don't allow going back to reading
-    if ($page === 'module' && isset($_SESSION['reader_materials_completed'][$moduleId])) {
-        header("Location: ?page=test&id=$moduleId");
-        exit;
-    }
+$testQuestions   = [];
+$viewedMaterials = [];
+$testLockInfo    = ['unlocked' => true];
+$lastAttempt     = null;
 
-    $stmt = $pdo->prepare("SELECT * FROM module_materials WHERE module_id = ? AND file_path IS NOT NULL AND file_path != ''");
+if ($validModule) {
+    // Materiallar
+    $stmt = $pdo->prepare("SELECT * FROM module_materials WHERE module_id=? AND file_path IS NOT NULL AND file_path != ''");
     $stmt->execute([$moduleId]);
     $moduleMaterials = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-    // Load questions for test and result pages
-    if (in_array($page, ['test', 'test_result'])) {
-        try {
-            // Removed ORDER BY order_index just in case it doesn't exist
-            $stmt = $pdo->prepare("SELECT tq.id, tq.question_text, ta.id as ans_id, ta.answer_text, ta.is_correct 
-                                   FROM test_questions tq 
-                                   LEFT JOIN test_answers ta ON tq.id = ta.question_id 
-                                   WHERE tq.module_id = ?");
-            $stmt->execute([$moduleId]);
-            $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
-            foreach ($rows as $r) {
-                if (!isset($testQuestions[$r['id']]))
-                    $testQuestions[$r['id']] = ['text' => $r['question_text'], 'answers' => []];
-                if ($r['ans_id'])
-                    $testQuestions[$r['id']]['answers'][] = ['id' => $r['ans_id'], 'text' => $r['answer_text']];
-            }
-        } catch (Exception $e) {
-            // Silently fail or log
+    // Ko'rilgan materiallar (DB dan)
+    $viewedMaterials = getViewedMaterials($pdo, $userId, $moduleId);
+
+    // Session ham yangilash
+    $_SESSION['reader_materials_viewed'][$moduleId] = $viewedMaterials;
+
+    // Modul tugatilganmi (DB dan)
+    if (isModuleCompleted($pdo, $userId, $moduleId)) {
+        $_SESSION['reader_materials_completed'][$moduleId] = true;
+    }
+
+    // Test lock info
+    $testLockInfo = isTestUnlocked($pdo, $userId, $moduleId);
+    $lastAttempt  = $testLockInfo['attempt'] ?? null;
+
+    // Test natijasini session ga yuklash (agar DB da bo'lsa)
+    if ($lastAttempt && !isset($_SESSION['reader_test_results'][$moduleId])) {
+        $detailsRaw = $lastAttempt['details'];
+        $details    = is_string($detailsRaw) ? json_decode($detailsRaw, true) : ($detailsRaw ?? []);
+        $_SESSION['reader_test_results'][$moduleId] = [
+            'score'   => $lastAttempt['score'],
+            'correct' => $lastAttempt['correct_count'],
+            'total'   => $lastAttempt['total_count'],
+            'status'  => $lastAttempt['status'],
+            'passing' => $lastAttempt['passing_percent'],
+            'time'    => date('d.m.Y H:i', strtotime($lastAttempt['attempted_at'])),
+            'details' => $details ?? [],
+        ];
+    }
+
+    // Module sahifasiga qaytarish (agar tugatilgan bo'lsa)
+    if ($page === 'module' && isset($_SESSION['reader_materials_completed'][$moduleId])) {
+        // Agar test muvaffaqiyatsiz va blok bo'lsa — module sahifasida qolsin
+        if (!isset($testLockInfo['blocked'])) {
+            header("Location: ?page=test&id=$moduleId");
+            exit;
         }
+    }
+
+    // Test sahifasi uchun oldindan redirect tekshiruvi (header() include dan oldin bo'lishi kerak)
+    if ($page === 'test') {
+        // Materiallar bor va tugatilmagan bo'lsa
+        if (count($moduleMaterials) > 0 && !isset($_SESSION['reader_materials_completed'][$moduleId])) {
+            header("Location: ?page=module&id=$moduleId");
+            exit;
+        }
+        // Materiallar yo'q — avtomatik completed
+        if (count($moduleMaterials) === 0 && !isset($_SESSION['reader_materials_completed'][$moduleId])) {
+            $_SESSION['reader_materials_completed'][$moduleId] = true;
+            try {
+                $pdo->prepare("INSERT IGNORE INTO reader_module_completions (user_id, module_id) VALUES (?,?)")
+                    ->execute([$userId, $moduleId]);
+            } catch (Exception $e) {}
+        }
+        // O'tilgan bo'lsa — natijaga yo'naltirish
+        if (!empty($testLockInfo['passed'])) {
+            header("Location: ?page=test_result&id=$moduleId");
+            exit;
+        }
+    }
+
+    // Test savollarini yuklash
+    if (in_array($page, ['test', 'test_result'])) {
+        $qLimit      = intval($currentModule['test_question_count'] ?? 0);
+        $testQuestions = loadTestQuestions($pdo, $moduleId, $qLimit);
     }
 }
 
-// Statistics
-$totalModules = count($assignedModules);
-$passedModules = 0;
+// ═══════════════════════════════════════════════════════════
+// STATISTICS
+// ═══════════════════════════════════════════════════════════
+$totalModules    = count($assignedModules);
+$passedModules   = 0;
 $inProgressCount = 0;
 foreach ($assignedModules as $m) {
     $st = getModuleStatus($m['id']);
-    if ($st === 'passed')
-        $passedModules++;
-    elseif (in_array($st, ['in_progress', 'test_ready']))
-        $inProgressCount++;
+    if ($st === 'passed')      $passedModules++;
+    elseif (in_array($st, ['in_progress', 'test_ready'])) $inProgressCount++;
 }
 
-// Progress for current module
-$viewedCount = $validModule ? count($_SESSION['reader_materials_viewed'][$moduleId] ?? []) : 0;
-$allMaterialsViewed = ($validModule && count($moduleMaterials) > 0) ? ($viewedCount >= count($moduleMaterials)) : ($validModule ? true : false);
+$viewedCount       = count($viewedMaterials);
+$allMaterialsViewed = ($validModule && count($moduleMaterials) > 0)
+    ? ($viewedCount >= count($moduleMaterials))
+    : ($validModule ? true : false);
 
-$testResult = ($page === 'test_result' && $validModule) ? ($_SESSION['reader_test_results'][$moduleId] ?? null) : null;
+$testResult = ($page === 'test_result' && $validModule)
+    ? ($_SESSION['reader_test_results'][$moduleId] ?? null)
+    : null;
 
-// Header & Navigation
+// ═══════════════════════════════════════════════════════════
+// RENDER
+// ═══════════════════════════════════════════════════════════
 $pageTitle = ($page === 'dashboard' ? 'Boshqaruv paneli' : ($currentModule['title'] ?? 'Modul')) . " — GMP O'quv Tizimi";
 require_once 'inc/header.php';
 require_once 'inc/sidebar.php';
@@ -290,7 +493,7 @@ require_once 'inc/sidebar.php';
         elseif ($page === 'test_result' && $validModule && $testResult)
             include 'pages/test_result.php';
         else
-            include 'pages/home.php'; // Default or 404
+            include 'pages/home.php';
         ?>
     </div>
 </main>

@@ -32,17 +32,14 @@ if ($pos_id > 0 && $mod_id > 0) {
             $stmt = $pdo->prepare($sql);
             $stmt->execute([$pos_id, $mod_id]);
             
-            if (function_exists('logAudit')) {
-                logAudit($user['id'], 'MATRIX_ADD', 'position', $pos_id, "Module ID: $mod_id added");
-            }
+            // logAudit o'rniga logActivity ishlatamiz (audit_logs jadvali yo'q)
+            logActivity('matrix_add', "Lavozim ID: $pos_id ga Modul ID: $mod_id biriktirildi", 'matrix');
         } else {
             $sql = "DELETE FROM training_matrix WHERE position_id = ? AND module_id = ?";
             $stmt = $pdo->prepare($sql);
             $stmt->execute([$pos_id, $mod_id]);
             
-            if (function_exists('logAudit')) {
-                logAudit($user['id'], 'MATRIX_REMOVE', 'position', $pos_id, "Module ID: $mod_id removed");
-            }
+            logActivity('matrix_remove', "Lavozim ID: $pos_id dan Modul ID: $mod_id olib tashlandi", 'matrix');
         }
 
         ob_end_clean();

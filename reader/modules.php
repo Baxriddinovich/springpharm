@@ -332,13 +332,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         </div>
 
                         <?php if (($user['role'] ?? '') !== 'reader'): ?>
-                        <div class="mt-auto pt-3 border-t border-slate-700/50 flex gap-2">
-                            <a href="materials.php?module_id=<?php echo $mod['id']; ?>" class="flex-1 bg-slate-800 hover:bg-slate-700 text-xs py-2 px-2 rounded text-center text-slate-300 transition truncate">
-                                Materiallar
-                            </a>
-                            <a href="questions.php?module_id=<?php echo $mod['id']; ?>" class="flex-1 bg-cyan-900/30 hover:bg-cyan-900/50 border border-cyan-800 text-cyan-400 text-xs py-2 px-2 rounded transition text-center truncate">
-                                Savollar
-                            </a>
+                        <div class="mt-auto pt-3 border-t border-slate-700/50 space-y-2">
+                            <div class="flex gap-2">
+                                <a href="materials.php?module_id=<?php echo $mod['id']; ?>" class="flex-1 bg-slate-800 hover:bg-slate-700 text-xs py-2 px-2 rounded text-center text-slate-300 transition truncate">
+                                    Materiallar
+                                </a>
+                                <a href="questions.php?module_id=<?php echo $mod['id']; ?>" class="flex-1 bg-cyan-900/30 hover:bg-cyan-900/50 border border-cyan-800 text-cyan-400 text-xs py-2 px-2 rounded transition text-center truncate">
+                                    Savollar
+                                </a>
+                            </div>
+                            <button onclick="openPdfModal(<?php echo $mod['id']; ?>, '<?php echo addslashes(htmlspecialchars($mod['title'])); ?>')"
+                                class="w-full bg-emerald-900/30 hover:bg-emerald-900/50 border border-emerald-800 text-emerald-400 text-xs py-2 px-2 rounded transition text-center flex items-center justify-center gap-1.5">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                                Natija PDF
+                            </button>
                         </div>
                         <?php endif; ?>
 
@@ -461,6 +468,68 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     </form>
     <?php endif; ?>
 
+    <!-- PDF MODAL -->
+    <div id="pdfModal" class="fixed inset-0 z-[200] hidden">
+        <div class="absolute inset-0 bg-black/80 backdrop-blur-sm" onclick="closePdfModal()"></div>
+        <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-slate-900 border border-slate-700 w-full max-w-md rounded-xl shadow-2xl overflow-hidden">
+            <div class="p-5 border-b border-slate-800 flex justify-between items-center">
+                <div>
+                    <h3 class="text-base font-bold text-white flex items-center gap-2">
+                        <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                        Natija PDF yuklash
+                    </h3>
+                    <p class="text-xs text-slate-500 mt-0.5" id="pdfModuleTitle"></p>
+                </div>
+                <button onclick="closePdfModal()" class="text-slate-500 hover:text-white p-1">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+            <div class="p-5">
+                <label class="block text-xs text-slate-400 mb-2 font-medium">Xodimni tanlang</label>
+                <select id="pdfUserSelect" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white focus:border-emerald-500 outline-none mb-3">
+                    <option value="">— Xodimni tanlang —</option>
+                    <?php
+                    try {
+                        $allReaders = $pdo->query("
+                            SELECT DISTINCT u.id, u.full_name, u.username, rta.module_id
+                            FROM users u
+                            JOIN reader_test_attempts rta ON rta.user_id = u.id
+                            WHERE u.role = 'reader'
+                            ORDER BY u.full_name ASC
+                        ")->fetchAll(PDO::FETCH_ASSOC);
+                    } catch (Exception $e) { $allReaders = []; }
+                    foreach ($allReaders as $r):
+                    ?>
+                    <option value="<?php echo $r['id']; ?>" data-module="<?php echo $r['module_id']; ?>">
+                        <?php echo htmlspecialchars($r['full_name']); ?> (<?php echo htmlspecialchars($r['username']); ?>)
+                    </option>
+                    <?php endforeach; ?>
+                </select>
+                <div id="pdfNoResults" class="hidden text-xs text-amber-400 mb-3 flex items-center gap-1.5 p-2 bg-amber-500/10 rounded-lg border border-amber-500/20">
+                    <svg class="w-3.5 h-3.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>
+                    Bu modul uchun hali test topshirilmagan.
+                </div>
+                <div class="space-y-2">
+                    <div class="flex gap-2">
+                        <button onclick="closePdfModal()" class="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 py-2.5 rounded-lg text-sm transition">
+                            Bekor qilish
+                        </button>
+                        <button onclick="openPdf()" id="pdfOpenBtn"
+                            class="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white py-2.5 rounded-lg text-sm font-semibold transition flex items-center justify-center gap-2">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+                            Tanlangan xodim PDF
+                        </button>
+                    </div>
+                    <button onclick="openAllPdf()" id="pdfAllBtn"
+                        class="w-full bg-cyan-700 hover:bg-cyan-600 text-white py-2.5 rounded-lg text-sm font-semibold transition flex items-center justify-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                        Barcha xodimlar PDF (umumiy)
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
         function toggleSidebar() {
             const sidebar = document.getElementById('sidebar');
@@ -548,6 +617,56 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 deleteIdInput.value = id;
                 deleteForm.submit();
             }
+        }
+
+        // ── PDF MODAL ──
+        let currentPdfModuleId = null;
+
+        function openPdfModal(moduleId, moduleTitle) {
+            currentPdfModuleId = moduleId;
+            document.getElementById('pdfModuleTitle').textContent = moduleTitle;
+            document.getElementById('pdfModal').classList.remove('hidden');
+            document.body.style.overflow = 'hidden';
+
+            // Faqat shu modul uchun test topshirganlarni ko'rsatish
+            const select = document.getElementById('pdfUserSelect');
+            const noResults = document.getElementById('pdfNoResults');
+            let hasOptions = false;
+
+            Array.from(select.options).forEach(opt => {
+                if (!opt.value) { opt.style.display = ''; return; }
+                const modId = parseInt(opt.getAttribute('data-module'));
+                if (modId === moduleId) {
+                    opt.style.display = '';
+                    hasOptions = true;
+                } else {
+                    opt.style.display = 'none';
+                }
+            });
+
+            select.value = '';
+            noResults.classList.toggle('hidden', hasOptions);
+            document.getElementById('pdfOpenBtn').disabled = !hasOptions;
+        }
+
+        function closePdfModal() {
+            document.getElementById('pdfModal').classList.add('hidden');
+            document.body.style.overflow = '';
+            currentPdfModuleId = null;
+        }
+
+        function openPdf() {
+            const userId = document.getElementById('pdfUserSelect').value;
+            if (!userId) { alert('Iltimos, xodimni tanlang!'); return; }
+            if (!currentPdfModuleId) return;
+            window.open('module_pdf.php?module_id=' + currentPdfModuleId + '&user_id=' + userId, '_blank');
+            closePdfModal();
+        }
+
+        function openAllPdf() {
+            if (!currentPdfModuleId) return;
+            window.open('module_pdf.php?module_id=' + currentPdfModuleId + '&user_id=0', '_blank');
+            closePdfModal();
         }
 
         if (modal) {

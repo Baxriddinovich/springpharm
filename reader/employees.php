@@ -24,6 +24,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save_
     if ($userId > 0) {
         $stmt = $pdo->prepare("UPDATE users SET position_id = ?, is_active = ? WHERE id = ? AND role = 'reader'");
         $stmt->execute([$positionId, $isActive, $userId]);
+        $posName = $positionId ? $pdo->query("SELECT name FROM positions WHERE id=$positionId")->fetchColumn() : 'Belgilanmagan';
+        logActivity('user_edited', "Xodim lavozimi o'zgartirildi (ID: $userId) → $posName", 'employees');
     }
 
     header("Location: employees.php");

@@ -14,13 +14,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if (!empty($name)) {
         if ($dept_id) {
-            // Update
             $stmt = $pdo->prepare("UPDATE departments SET name=? WHERE id=?");
             $stmt->execute([$name, $dept_id]);
+            logActivity('department_edited', "Bo'lim tahrirlandi: $name (ID: $dept_id)", 'departments');
         } else {
-            // Insert
             $stmt = $pdo->prepare("INSERT INTO departments (name) VALUES (?)");
             $stmt->execute([$name]);
+            logActivity('department_added', "Yangi bo'lim qo'shildi: $name", 'departments');
         }
     }
     header("Location: departments.php");
@@ -35,11 +35,10 @@ if (isset($_GET['delete'])) {
     $count = $check->fetchColumn();
 
     if ($count > 0) {
-        // Xodimlar bo'lsa, o'chirmaymiz va xatolik beramiz
-        // Session flash message yozish yoki JavaScript alert ishlatish mumkin
         echo "<script>alert('Diqqat: Ushbu bo\'limda xodimlar mavjud. Avval xodimlarni o\'chirishingiz yoki boshqa bo\'limga o\'tkazishingiz kerak.');</script>";
     } else {
         $pdo->prepare("DELETE FROM departments WHERE id=?")->execute([$id]);
+        logActivity('department_deleted', "Bo'lim o'chirildi (ID: $id)", 'departments');
         header("Location: departments.php");
         exit;
     }
@@ -129,13 +128,26 @@ if (isset($_GET['delete'])) {
                                     <?php echo htmlspecialchars($dept['name']); ?>
                                 </div>
                             </td>
-                            <!-- Xodimlar sonini dinamik ko'rsatish yaxshi ko'rinadi -->
                             <td class="px-6 py-4 text-center text-slate-400">
                                 <?php 
-                                    // Oddiy so'rov sonini olish
-                                    $empCount = $pdo->prepare("SELECT COUNT(*) FROM employees WHERE department_id = ?");
-                                    $empCount->execute([$dept['id']]);
-                                    echo $empCount->fetchColumn();
+                                    // Bo'lim → Lavozimlar → Xodimlar
+                                    $empCount = $pdo->prepare("
+                                        SELECT COUNT(DISTINCT u.id) FROM users u
+                                        JOIN positions p ON u.position_id = p.id
+                                        WHERE u.role='reader' AND u.is_active=1
+                                        AND p.name LIKE ?
+                                    ");
+                                    $empCount->execute(['%' . $dept['name'] . '%']);
+                                    $cnt = $empCount->fetchColumn();
+                                    // Agar 0 bo'lsa, employees jadvalidan ham tekshiramiz
+                                    if ($cnt == 0) {
+                                        try {
+                                            $ec2 = $pdo->prepare("SELECT COUNT(*) FROM employees WHERE department_id=?");
+                                            $ec2->execute([$dept['id']]);
+                                            $cnt = $ec2->fetchColumn();
+                                        } catch (Exception $e) {}
+                                    }
+                                    echo $cnt;
                                 ?>
                             </td>
                             <td class="px-6 py-4 text-right">

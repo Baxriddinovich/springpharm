@@ -33,6 +33,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 
+    // Testda chiqadigan savollar sonini saqlash
+    if (isset($_POST['action']) && $_POST['action'] === 'save_question_count') {
+        $qcount = intval($_POST['test_question_count'] ?? 0);
+        $pdo->prepare("UPDATE training_modules SET test_question_count=? WHERE id=?")->execute([$qcount, $module_id]);
+        header("Location: questions.php?module_id=$module_id&saved=1");
+        exit;
+    }
+
     if (isset($_POST['action']) && $_POST['action'] === 'delete_question') {
         $q_id = isset($_POST['question_id']) ? (int)$_POST['question_id'] : 0;
         if ($q_id > 0) {
@@ -110,6 +118,58 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     </header>
 
     <main class="container mx-auto p-4 lg:p-8">
+
+        <!-- Testda chiqadigan savollar soni sozlamasi -->
+        <div class="glass-card rounded-xl p-5 mb-6 border-cyan-500/20">
+            <form method="POST" class="flex flex-wrap items-end gap-4">
+                <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token']); ?>">
+                <input type="hidden" name="action" value="save_question_count">
+                <div class="flex-1 min-w-[200px]">
+                    <label class="block text-xs text-slate-400 mb-2 font-medium">
+                        <svg class="w-3.5 h-3.5 inline mr-1 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+                        Testda chiqadigan savollar soni
+                        <span class="text-slate-600 ml-1">(Jami: <?php echo count($questions); ?> ta savol)</span>
+                    </label>
+                    <div class="flex flex-wrap gap-2">
+                        <?php
+                        $currentCount = intval($module['test_question_count'] ?? 0);
+                        $presets = [0, 5, 8, 10, 15, 20];
+                        foreach ($presets as $p):
+                            $label = $p === 0 ? 'Hammasi' : $p . ' ta';
+                            $active = $currentCount === $p;
+                        ?>
+                        <button type="submit" name="test_question_count" value="<?php echo $p; ?>"
+                            class="px-4 py-2 rounded-lg text-sm font-medium transition <?php echo $active ? 'bg-cyan-600 text-white shadow-lg shadow-cyan-500/20' : 'bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white'; ?>">
+                            <?php echo $label; ?>
+                        </button>
+                        <?php endforeach; ?>
+                        <!-- Custom input -->
+                        <div class="flex items-center gap-2">
+                            <input type="number" name="test_question_count" id="customCount"
+                                min="1" max="<?php echo max(count($questions), 1); ?>"
+                                placeholder="Boshqa..."
+                                class="w-24 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:border-cyan-500 outline-none"
+                                onchange="this.form.submit()">
+                        </div>
+                    </div>
+                    <?php if ($currentCount > 0 && $currentCount < count($questions)): ?>
+                    <p class="text-xs text-amber-400 mt-2">
+                        <svg class="w-3 h-3 inline mr-1" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>
+                        Har safar testda <?php echo $currentCount; ?> ta savol tasodifiy tanlanadi
+                    </p>
+                    <?php elseif ($currentCount === 0): ?>
+                    <p class="text-xs text-slate-500 mt-2">Hozir barcha <?php echo count($questions); ?> ta savol chiqadi</p>
+                    <?php endif; ?>
+                </div>
+            </form>
+            <?php if (isset($_GET['saved'])): ?>
+            <div class="mt-3 text-xs text-emerald-400 flex items-center gap-1">
+                <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
+                Saqlandi!
+            </div>
+            <?php endif; ?>
+        </div>
+
         <?php if($questions): ?>
         <div class="space-y-4">
             <?php $num = 1; foreach($questions as $q): ?>
