@@ -27,7 +27,7 @@ try {
             rta.passing_percent,
             tm.title AS module_title
         FROM reader_test_attempts rta
-        JOIN training_modules tm ON rta.module_id = tm.id
+        LEFT JOIN training_modules tm ON rta.module_id = tm.id
         WHERE rta.user_id = ?
         ORDER BY rta.attempted_at DESC");
         $detailStmt->execute([$selectedUserId]);
@@ -52,7 +52,7 @@ try {
             MAX(rta.attempted_at) AS last_date,
             SUM(rta.status = 'passed') AS passed_count
         FROM reader_test_attempts rta
-        JOIN users u ON rta.user_id = u.id
+        LEFT JOIN users u ON rta.user_id = u.id
         GROUP BY u.id, u.full_name
         ORDER BY MAX(rta.attempted_at) DESC");
         $results = $listStmt->fetchAll(PDO::FETCH_ASSOC);
@@ -164,7 +164,7 @@ try {
                                         $statusText = $isPassed ? 'O‘tgan' : 'Qoniqarsiz';
                                     ?>
                                         <tr class="hover:bg-slate-800/40 transition">
-                                            <td class="px-4 py-3 text-slate-100"><?php echo htmlspecialchars($row['module_title']); ?></td>
+                                            <td class="px-4 py-3 text-slate-100"><?php echo htmlspecialchars($row['module_title'] ?: 'Belgilanmagan modul'); ?></td>
                                             <td class="px-4 py-3"><span class="inline-flex items-center px-2 py-1 rounded bg-slate-900 text-white font-medium"><?php echo $row['score']; ?>%</span></td>
                                             <td class="px-4 py-3">
                                                 <span class="inline-flex items-center px-3 py-1 rounded-full text-xs border <?php echo $statusClass; ?>">
