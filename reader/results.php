@@ -7,49 +7,54 @@ require_once '../db.php';
 requireLogin();
 $user = getCurrentUser();
 
-$selectedName = isset($_GET['employee_name']) ? trim($_GET['employee_name']) : null;
+$selectedUserId   = isset($_GET['user_id']) ? intval($_GET['user_id']) : null;
+$selectedUserName = null;
 $results = [];
 $summary = null;
 
 try {
-    if ($selectedName) {
+    if ($selectedUserId) {
+        $userStmt = $pdo->prepare("SELECT full_name FROM users WHERE id = ? LIMIT 1");
+        $userStmt->execute([$selectedUserId]);
+        $selectedUserName = $userStmt->fetchColumn();
+
         $detailStmt = $pdo->prepare("SELECT 
-            ta.score_percent AS score,
-            ta.status,
-            ta.completed_at,
-            tt.employee_name AS full_name,
-            t.name AS module_title,
-            t.passing_percent AS pass_score
-        FROM training_attempts ta
-        JOIN training_tokens tt ON ta.token_id = tt.id
-        JOIN trainings t ON tt.training_id = t.id
-        WHERE tt.employee_name = ?
-        ORDER BY ta.completed_at DESC");
-        $detailStmt->execute([$selectedName]);
+            rta.score,
+            rta.status,
+            rta.attempted_at,
+            rta.correct_count,
+            rta.total_count,
+            rta.passing_percent,
+            tm.title AS module_title
+        FROM reader_test_attempts rta
+        JOIN training_modules tm ON rta.module_id = tm.id
+        WHERE rta.user_id = ?
+        ORDER BY rta.attempted_at DESC");
+        $detailStmt->execute([$selectedUserId]);
         $results = $detailStmt->fetchAll(PDO::FETCH_ASSOC);
 
         $summaryStmt = $pdo->prepare("SELECT 
             COUNT(*) AS attempts,
-            AVG(ta.score_percent) AS average_score,
-            MAX(ta.completed_at) AS last_date,
-            SUM(ta.status = 'passed') AS passed_count,
-            SUM(ta.status != 'passed') AS failed_count
-        FROM training_attempts ta
-        JOIN training_tokens tt ON ta.token_id = tt.id
-        WHERE tt.employee_name = ?");
-        $summaryStmt->execute([$selectedName]);
+            AVG(rta.score) AS average_score,
+            MAX(rta.attempted_at) AS last_date,
+            SUM(rta.status = 'passed') AS passed_count,
+            SUM(rta.status != 'passed') AS failed_count
+        FROM reader_test_attempts rta
+        WHERE rta.user_id = ?");
+        $summaryStmt->execute([$selectedUserId]);
         $summary = $summaryStmt->fetch(PDO::FETCH_ASSOC);
     } else {
         $listStmt = $pdo->query("SELECT 
-            tt.employee_name AS full_name,
+            u.id AS user_id,
+            u.full_name,
             COUNT(*) AS attempts,
-            AVG(ta.score_percent) AS average_score,
-            MAX(ta.completed_at) AS last_date,
-            SUM(ta.status = 'passed') AS passed_count
-        FROM training_attempts ta
-        JOIN training_tokens tt ON ta.token_id = tt.id
-        GROUP BY tt.employee_name
-        ORDER BY MAX(ta.completed_at) DESC");
+            AVG(rta.score) AS average_score,
+            MAX(rta.attempted_at) AS last_date,
+            SUM(rta.status = 'passed') AS passed_count
+        FROM reader_test_attempts rta
+        JOIN users u ON rta.user_id = u.id
+        GROUP BY u.id, u.full_name
+        ORDER BY MAX(rta.attempted_at) DESC");
         $results = $listStmt->fetchAll(PDO::FETCH_ASSOC);
     }
 } catch (Exception $e) {
@@ -88,9 +93,9 @@ try {
         <header class="hidden lg:flex sticky top-0 z-40 bg-slate-900/80 backdrop-blur-md border-b border-slate-800 px-8 py-5 justify-between items-center">
             <div>
                 <h2 class="text-2xl font-bold">Test Natijalari</h2>
-                <p class="text-sm text-slate-400 mt-1">Har bir F.I.Sh uchun test natijalari yagona satrda ko'rsatiladi.</p>
+                <p class="text-sm text-slate-400 mt-1">Bu sahifa faqat oʻqish tarmogʻida saqlangan natijalarni koʻrsatadi.</p>
             </div>
-            <?php if ($selectedName): ?>
+            <?php if ($selectedUserId): ?>
                 <a href="results.php" class="text-sm text-cyan-400 hover:text-cyan-300">Barcha natijalar ro'yxatini ko'rish</a>
             <?php endif; ?>
         </header>
@@ -100,12 +105,12 @@ try {
                 <div class="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-4">
                     <div>
                         <h1 class="text-2xl font-semibold text-white">Natijalar</h1>
-                        <p class="text-sm text-slate-400 mt-1">F.I.Sh ustiga bosilganda shu nomga tegishli barcha testlar ochiladi.</p>
+                        <p class="text-sm text-slate-400 mt-1">F.I.Sh ustiga bosilganda shu foydalanuvchining barcha natijalari ko'rinadi.</p>
                     </div>
-                    <?php if ($selectedName && $summary): ?>
+                    <?php if ($selectedUserId && $summary): ?>
                         <div class="rounded-2xl bg-slate-800/80 border border-slate-700 p-4 space-y-2 text-sm">
                             <div class="text-slate-400">Tanlangan xodim:</div>
-                            <div class="text-white font-semibold"><?php echo htmlspecialchars($selectedName); ?></div>
+                            <div class="text-white font-semibold"><?php echo htmlspecialchars($selectedUserName ?? 'Noma’lum'); ?></div>
                             <div class="grid grid-cols-2 gap-3 mt-3 text-xs text-slate-400">
                                 <div class="bg-slate-900/80 p-3 rounded-xl">
                                     <div class="text-slate-400">Testlar soni</div>
@@ -116,7 +121,7 @@ try {
                                     <div class="text-white font-semibold"><?php echo $summary['average_score'] !== null ? round($summary['average_score'], 1) . '%' : '—'; ?></div>
                                 </div>
                                 <div class="bg-slate-900/80 p-3 rounded-xl">
-                                    <div class="text-slate-400">O'tganlari</div>
+                                    <div class="text-slate-400">O'tganlar</div>
                                     <div class="text-white font-semibold"><?php echo (int)$summary['passed_count']; ?></div>
                                 </div>
                                 <div class="bg-slate-900/80 p-3 rounded-xl">
@@ -129,12 +134,12 @@ try {
                 </div>
             </div>
 
-            <?php if ($selectedName): ?>
+            <?php if ($selectedUserId): ?>
                 <div class="glass-card rounded-xl overflow-hidden p-6">
                     <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
                         <div>
-                            <h3 class="text-lg font-semibold text-white"><?php echo htmlspecialchars($selectedName); ?> uchun barcha test natijalari</h3>
-                            <p class="text-sm text-slate-400">Barcha modul bo'yicha topshirilgan testlar.</p>
+                            <h3 class="text-lg font-semibold text-white"><?php echo htmlspecialchars($selectedUserName ?? 'Foydalanuvchi'); ?> uchun barcha test natijalari</h3>
+                            <p class="text-sm text-slate-400">Bu foydalanuvchining reader_test_attempts jadvalidan olingan natijalari.</p>
                         </div>
                         <a href="results.php" class="inline-flex items-center gap-2 text-sm text-cyan-400 hover:text-cyan-300">← Barcha ismlar</a>
                     </div>
@@ -151,12 +156,12 @@ try {
                             </thead>
                             <tbody class="divide-y divide-slate-700/50">
                                 <?php if (empty($results)): ?>
-                                    <tr><td colspan="4" class="py-8 text-center text-slate-500">Bu nom bo'yicha natija topilmadi.</td></tr>
+                                    <tr><td colspan="4" class="py-8 text-center text-slate-500">Bu foydalanuvchi uchun natija yo'q.</td></tr>
                                 <?php else: ?>
                                     <?php foreach ($results as $row):
-                                        $isPassed = strtolower($row['status']) === 'passed' || strtolower($row['status']) === 'success';
+                                        $isPassed = strtolower($row['status']) === 'passed';
                                         $statusClass = $isPassed ? 'text-emerald-400 bg-emerald-400/10 border-emerald-400/20' : 'text-red-400 bg-red-400/10 border-red-400/20';
-                                        $statusText = $isPassed ? "O'tgan" : 'Qoniqarsiz';
+                                        $statusText = $isPassed ? 'O‘tgan' : 'Qoniqarsiz';
                                     ?>
                                         <tr class="hover:bg-slate-800/40 transition">
                                             <td class="px-4 py-3 text-slate-100"><?php echo htmlspecialchars($row['module_title']); ?></td>
@@ -166,7 +171,7 @@ try {
                                                     <?php echo $statusText; ?>
                                                 </span>
                                             </td>
-                                            <td class="px-4 py-3 text-slate-400"><?php echo $row['completed_at'] ? date('d.m.Y H:i', strtotime($row['completed_at'])) : '-'; ?></td>
+                                            <td class="px-4 py-3 text-slate-400"><?php echo $row['attempted_at'] ? date('d.m.Y H:i', strtotime($row['attempted_at'])) : '-'; ?></td>
                                         </tr>
                                     <?php endforeach; ?>
                                 <?php endif; ?>
@@ -179,7 +184,7 @@ try {
                     <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
                         <div>
                             <h3 class="text-lg font-semibold text-white">F.I.Sh bo'yicha umumiy natijalar</h3>
-                            <p class="text-sm text-slate-400">Ayni damdagi barcha xodimlar test natijalari.</p>
+                            <p class="text-sm text-slate-400">Reader testlaridan saqlangan amaldagi natijalar.</p>
                         </div>
                     </div>
 
@@ -201,11 +206,11 @@ try {
                                     <?php foreach ($results as $row):
                                         $avgScore = $row['average_score'] !== null ? round($row['average_score'], 1) : 0;
                                         $statusClass = $avgScore >= 80 ? 'text-emerald-400 bg-emerald-400/10 border-emerald-400/20' : 'text-amber-400 bg-amber-400/10 border-amber-400/20';
-                                        $statusText = $avgScore >= 80 ? 'Yaxshi' : "Ehtiyot bo'lish kerak";
+                                        $statusText = $avgScore >= 80 ? 'Yaxshi' : 'Ehtiyot bo‘lish kerak';
                                     ?>
                                         <tr class="hover:bg-slate-800/40 transition">
                                             <td class="px-4 py-3 font-medium text-white">
-                                                <a href="results.php?employee_name=<?php echo urlencode($row['full_name']); ?>" class="hover:text-cyan-300 transition">
+                                                <a href="results.php?user_id=<?php echo urlencode($row['user_id']); ?>" class="hover:text-cyan-300 transition">
                                                     <?php echo htmlspecialchars($row['full_name']); ?>
                                                 </a>
                                             </td>
