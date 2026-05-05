@@ -156,7 +156,7 @@ try {
                                     <?php foreach ($results as $row):
                                         $isPassed = strtolower($row['status']) === 'passed' || strtolower($row['status']) === 'success';
                                         $statusClass = $isPassed ? 'text-emerald-400 bg-emerald-400/10 border-emerald-400/20' : 'text-red-400 bg-red-400/10 border-red-400/20';
-                                        $statusText = $isPassed ? 'O'tgan' : 'Qoniqarsiz';
+                                        $statusText = $isPassed ? "O'tgan" : 'Qoniqarsiz';
                                     ?>
                                         <tr class="hover:bg-slate-800/40 transition">
                                             <td class="px-4 py-3 text-slate-100"><?php echo htmlspecialchars($row['module_title']); ?></td>
@@ -201,7 +201,7 @@ try {
                                     <?php foreach ($results as $row):
                                         $avgScore = $row['average_score'] !== null ? round($row['average_score'], 1) : 0;
                                         $statusClass = $avgScore >= 80 ? 'text-emerald-400 bg-emerald-400/10 border-emerald-400/20' : 'text-amber-400 bg-amber-400/10 border-amber-400/20';
-                                        $statusText = $avgScore >= 80 ? 'Yaxshi' : 'Ehtiyot bo'lish kerak';
+                                        $statusText = $avgScore >= 80 ? 'Yaxshi' : "Ehtiyot bo'lish kerak";
                                     ?>
                                         <tr class="hover:bg-slate-800/40 transition">
                                             <td class="px-4 py-3 font-medium text-white">
