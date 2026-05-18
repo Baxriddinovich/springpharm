@@ -3,9 +3,9 @@
 // Tayyorlovchi: GXP Service Pharm
 
 $host = 'localhost';
-$dbname = 'gxpharm_ombor';
-$username = 'root';
-$password = '';
+$dbname = 'ombor_db';
+$username = 'fastuser';
+$password = 'Boburbek13@@';
 
 try {
     $pdo = new PDO("mysql:host=$host;dbname=$dbname;charset=utf8mb4", $username, $password, [
