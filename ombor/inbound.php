@@ -1,13 +1,15 @@
 <?php
-error_reporting(E_ALL);
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
 session_start();
-require 'db.php'; // DB bog'lanish
-// QR code kutubxonasini qo'shish (phpqrcode.php fayli phpqrcode papkasida bo'lishi kerak)
-if (file_exists('libs/phpqrcode.php')) {
-    require_once 'libs/phpqrcode.php';
+require 'db.php'; 
+
+// --- QR KUTUBXONASINI YUKLASH (Xavfsiz usul) ---
+// Agar phpqrcode papkasi mavjud bo'lsa, uni yuklaymiz
+ $lib_path = 'phpqrcode/qrlib.php';
+if (file_exists($lib_path)) {
+    require_once $lib_path;
 }
+// -------------------------------------------------
+
 // Tizimga kirganini tekshirish
 if (!isset($_SESSION['user_id'])) {
     header("Location: index.php");
@@ -22,30 +24,32 @@ if (!in_array($_SESSION['role'], ['Admin', 'Ombor mudiri'])) {
 
  $message = '';
  $messageType = '';
+ $warning = ''; // QR yoki papka xatoliklari uchun
 
-// Materiallarni olish
- $materials = $pdo->query("SELECT * FROM materials WHERE status = 1 ORDER BY material_name")->fetchAll();
+// Dropdown uchun ma'lumotlarni olish (datalistda ko'rsatish uchun)
+ $materials = $pdo->query("SELECT material_name FROM materials WHERE status = 1 ORDER BY material_name")->fetchAll();
+ $suppliers = $pdo->query("SELECT company_name FROM suppliers WHERE status = 1 ORDER BY company_name")->fetchAll();
 
-// Ta'minotchilarni olish
- $suppliers = $pdo->query("SELECT * FROM suppliers WHERE status = 1 ORDER BY company_name")->fetchAll();
-//ASDAS
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-    // Ma'lumotlarni olish
-    $material_id = $_POST['material_id'] ?? null;
-    $batch_number = trim($_POST['batch_number']);
-    $supplier_id = $_POST['supplier_id'] ?? null;
-    $manufacturer = trim($_POST['manufacturer']);
-    $received_date = $_POST['received_date'];
-    $production_date = $_POST['production_date'];
-    $exp_date = $_POST['exp_date'];
-    $quantity = $_POST['quantity'];
-    $unit = $_POST['unit'];
-    $storage_location = trim($_POST['storage_location']);
-    $storage_temp = trim($_POST['storage_temp']);
-    $notes = trim($_POST['notes']);
+    // Inputdan matnni olish
+    $material_name = trim($_POST['material_name'] ?? ''); // Xatolik oldini olish uchun ?? '' qo'shildi
+    $batch_number = trim($_POST['batch_number'] ?? '');
+    $supplier_name = trim($_POST['supplier_name'] ?? '');
+    $manufacturer = trim($_POST['manufacturer'] ?? '');
+    $received_date = $_POST['received_date'] ?? date('Y-m-d');
+    $production_date = $_POST['production_date'] ?? '';
+    $exp_date = $_POST['exp_date'] ?? '';
+    $quantity = $_POST['quantity'] ?? 0;
+    $unit = $_POST['unit'] ?? 'kg';
+    $storage_location = trim($_POST['storage_location'] ?? '');
+    $storage_temp = trim($_POST['storage_temp'] ?? '');
+    $notes = trim($_POST['notes'] ?? '');
     
     // Validatsiya
-    if (empty($batch_number)) {
+    if (empty($material_name)) {
+        $message = "Mahsulot nomi kiritilishi shart!";
+        $messageType = 'danger';
+    } elseif (empty($batch_number)) {
         $message = "Seriya raqami (Batch No) to'ldirilishi shart!";
         $messageType = 'danger';
     } elseif (empty($exp_date)) {
@@ -55,27 +59,66 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         try {
             $pdo->beginTransaction();
             
-            // 1. QR Code generatsiya qilish
-            // QR ma'lumotlari: Unikal ID bo'ladi keyin, hozircha Batch va Exp
-            $qr_text = "GXP|MAT{$material_id}|BATCH{$batch_number}|EXP{$exp_date}|QTY{$quantity}";
+            // --- 1. Materialni qidirish yoki yaratish ---
+            $stmt = $pdo->prepare("SELECT id FROM materials WHERE material_name = ?");
+            $stmt->execute([$material_name]);
+            $mat = $stmt->fetch();
             
-            // Papkani tekshirish
+            if ($mat) {
+                $material_id = $mat['id'];
+            } else {
+                // Yangi material yaratish
+                $stmtNew = $pdo->prepare("INSERT INTO materials (material_name, material_type, status) VALUES (?, 'Boshqa', 1)");
+                $stmtNew->execute([$material_name]);
+                $material_id = $pdo->lastInsertId();
+            }
+
+            // --- 2. Ta'minotchini qidirish yoki yaratish ---
+            $supplier_id = null;
+            if (!empty($supplier_name)) {
+                $stmtSup = $pdo->prepare("SELECT id FROM suppliers WHERE company_name = ?");
+                $stmtSup->execute([$supplier_name]);
+                $sup = $stmtSup->fetch();
+                
+                if ($sup) {
+                    $supplier_id = $sup['id'];
+                } else {
+                    // Yangi supplier yaratish
+                    $stmtNewSup = $pdo->prepare("INSERT INTO suppliers (company_name, status) VALUES (?, 1)");
+                    $stmtNewSup->execute([$supplier_name]);
+                    $supplier_id = $pdo->lastInsertId();
+                }
+            }
+
+            // --- 3. QR kod generatsiyasi (Xatoliklarga chidamli) ---
+            $filename = null;
+            
+            // Papka mavjudligini va yozish huquqini tekshiramiz
             $dir = 'uploads/qrcodes/';
+            
             if (!is_dir($dir)) {
-                mkdir($dir, 0777, true);
+                // Xatolikni bostirish uchun @ ishlatildi
+                if (!@mkdir($dir, 0777, true)) {
+                    $warning = "QR kod papkasi yaratib bo'lmadi (Server ruxsatlari). Ma'lumotlar saqlandi, lekin QR yo'q.";
+                }
+            }
+
+            // Agar klass mavjud bo'lsa va papka yozishga ochiq bo'lsa
+            if (class_exists('QRcode') && is_writable($dir)) {
+                try {
+                    $qr_text = "GXP|MAT{$material_id}|BATCH{$batch_number}|EXP{$exp_date}|QTY{$quantity}";
+                    $filename = $dir . "inbound_" . time() . "_" . uniqid() . ".png";
+                    QRcode::png($qr_text, $filename, 'H', 4, 2); 
+                } catch (Exception $qr_e) {
+                    $warning = "QR kod yaratishda xatolik: " . $qr_e->getMessage();
+                }
+            } elseif (!class_exists('QRcode')) {
+                $warning = "QR kutubxonasi topilmadi. Ma'lumotlar saqlandi.";
+            } elseif (!is_writable($dir)) {
+                $warning = "QR kod papkasiga yozish huquqi yo'q. Ma'lumotlar saqlandi.";
             }
             
-            // Fayl nomi
-            $filename = $dir . "inbound_" . time() . "_" . uniqid() . ".png";
-           if (class_exists('QRcode')) {
-    QRcode::png($qr_text, $filename, 'H', 4, 2);
-} else {
-    die('QRcode class topilmadi');
-}
-            
-            // 2. Ma'lumotlarni bazaga kiritish
-            // Status avtomatik 'KARANTIN' (TZ talabi)
-            // received_by avtomatik $_SESSION['user_id']
+            // --- 4. Ma'lumotlarni inventory ga kiritish ---
             $stmt = $pdo->prepare("
                 INSERT INTO inventory 
                 (material_id, batch_number, supplier_id, manufacturer, received_date, production_date, exp_date, 
@@ -90,7 +133,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             
             $inventory_id = $pdo->lastInsertId();
             
-            // Audit trail (agar db.php da funksiya bor deb faraz qilsak)
+            // Audit trail
             if (function_exists('logAuditTrail')) {
                 logAuditTrail($pdo, 'Kirim qilish (Inbound)', 'inventory', $inventory_id, null, [
                     'batch_number' => $batch_number,
@@ -101,7 +144,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             
             $pdo->commit();
             
-            $message = "Mahsulot muvaffaqiyatli kiritildi va KARANTIN ga qo'yildi! Partiya: {$batch_number}";
+            $message = "Mahsulot muvaffaqiyatli kiritildi! Partiya: {$batch_number}";
             $messageType = 'success';
             
             // Formani tozalash
@@ -113,7 +156,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $messageType = 'danger';
         } catch (Exception $e) {
             $pdo->rollBack();
-            $message = "QR kod yaratishda xatolik: " . $e->getMessage();
+            $message = "Xatolik: " . $e->getMessage();
             $messageType = 'danger';
         }
     }
@@ -192,6 +235,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         <div class="alert alert-<?= $messageType ?> alert-dismissible fade show" role="alert">
             <i class="fas <?= $messageType == 'success' ? 'fa-check-circle' : 'fa-exclamation-circle' ?> me-2"></i>
             <?= $message ?>
+            <?php if($warning): ?>
+                <div class="mt-2 text-muted small border-top pt-2"><i class="fas fa-exclamation-triangle me-1"></i> <?= $warning ?></div>
+            <?php endif; ?>
             <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
         </div>
     <?php endif; ?>
@@ -204,27 +250,28 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     <h6 class="mb-3 text-primary border-bottom pb-2">Mahsulot tafsilotlari</h6>
                     <div class="row g-3">
                         <div class="col-md-6">
-    <label class="form-label">Mahsulot nomi <span class="text-danger">*</span></label>
-    <input type="text" 
-           name="material_name" 
-           class="form-control" 
-           value="<?= $_POST['material_name'] ?? '' ?>" 
-           placeholder="Mahsulot nomini kiriting" 
-           required>
-</div>
+                            <label class="form-label">Mahsulot nomi <span class="text-danger">*</span></label>
+                            <input type="text" name="material_name" class="form-control" list="materials_list" value="<?= $_POST['material_name'] ?? '' ?>" placeholder="Nomini yozing..." required autocomplete="off">
+                            <datalist id="materials_list">
+                                <?php foreach($materials as $m): ?>
+                                    <option value="<?= htmlspecialchars($m['material_name']) ?>">
+                                <?php endforeach; ?>
+                            </datalist>
+                        </div>
                         <div class="col-md-6">
                             <label class="form-label">Seriya raqami (Batch No) <span class="text-danger">*</span></label>
                             <input type="text" name="batch_number" class="form-control" value="<?= $_POST['batch_number'] ?? '' ?>" placeholder="MAS: BATCH-2024-001" required>
                         </div>
                         
                         <div class="col-md-6">
-    <label class="form-label">Ta'minotchi</label>
-    <input type="text" 
-           name="supplier_name" 
-           class="form-control" 
-           value="<?= $_POST['supplier_name'] ?? '' ?>" 
-           placeholder="Ta'minotchi nomini kiriting">
-</div>
+                            <label class="form-label">Ta'minotchi</label>
+                            <input type="text" name="supplier_name" class="form-control" list="suppliers_list" value="<?= $_POST['supplier_name'] ?? '' ?>" placeholder="Nomini yozing..." autocomplete="off">
+                            <datalist id="suppliers_list">
+                                <?php foreach($suppliers as $s): ?>
+                                    <option value="<?= htmlspecialchars($s['company_name']) ?>">
+                                <?php endforeach; ?>
+                            </datalist>
+                        </div>
                         <div class="col-md-6">
                             <label class="form-label">Ishlab chiqaruvchi</label>
                             <input type="text" name="manufacturer" class="form-control" value="<?= $_POST['manufacturer'] ?? '' ?>" placeholder="Ishlab chiqaruvchi nomi">
@@ -289,7 +336,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     
                     <div class="alert alert-info mb-3 p-2 small">
                         <i class="fas fa-info-circle me-1"></i> 
-                        <strong>Avtomatik:</strong> Status "KARANTIN" bo'ladi. QR kod generatsiya qilinadi.
+                        <strong>Avtomatik:</strong> Status "KARANTIN". Agar mahsulot/ta'minotchi bo'lmasa, yangi yaratiladi.
                     </div>
 
                     <div class="mb-3">
