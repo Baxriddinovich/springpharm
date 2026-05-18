@@ -31,7 +31,7 @@ if (!in_array($_SESSION['role'], ['Admin', 'Ombor mudiri'])) {
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     // Ma'lumotlarni olish
-    $material_id = $_POST['material_id'];
+    $material_id = $_POST['material_id'] ?? null;
     $batch_number = trim($_POST['batch_number']);
     $supplier_id = $_POST['supplier_id'] ?? null;
     $manufacturer = trim($_POST['manufacturer']);
@@ -67,9 +67,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             
             // Fayl nomi
             $filename = $dir . "inbound_" . time() . "_" . uniqid() . ".png";
-            
-            // QR code yaratish (png formatida saqlash)
-            QRcode::png($qr_text, $filename, 'H', 4, 2);
+           if (class_exists('QRcode')) {
+    QRcode::png($qr_text, $filename, 'H', 4, 2);
+} else {
+    die('QRcode class topilmadi');
+}
             
             // 2. Ma'lumotlarni bazaga kiritish
             // Status avtomatik 'KARANTIN' (TZ talabi)
