@@ -4,9 +4,8 @@ require 'db.php';
 
 // --- QR KUTUBXONASINI YUKLASH (Xavfsiz usul) ---
 // Agar phpqrcode papkasi mavjud bo'lsa, uni yuklaymiz
- $lib_path = 'phpqrcode/qrlib.php';
-if (file_exists($lib_path)) {
-    require_once $lib_path;
+if (file_exists('libs/phpqrcode.php')) {
+    require_once 'libs/phpqrcode.php';
 }
 // -------------------------------------------------
 
