@@ -5,8 +5,9 @@ ini_set('display_startup_errors', 1);
 session_start();
 require 'db.php'; // DB bog'lanish
 // QR code kutubxonasini qo'shish (phpqrcode.php fayli phpqrcode papkasida bo'lishi kerak)
-require 'phpqrcode/qrlib.php'; 
-
+if (file_exists('libs/phpqrcode.php')) {
+    require_once 'libs/phpqrcode.php';
+}
 // Tizimga kirganini tekshirish
 if (!isset($_SESSION['user_id'])) {
     header("Location: index.php");
