@@ -12,18 +12,22 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $stmt->execute([$username]);
     $user = $stmt->fetch();
 
-    if ($user && password_verify($password, $user['password'])) {
-        $_SESSION['user_id'] = $user['id'];
-        $_SESSION['role'] = $user['role'];
-        $_SESSION['fullname'] = $user['fullname'];
-        
-        // Audit log: Tizimga kirish qayd etiladi
-        // Bu joyga audit log funksiyasini keyinchalik ulaymiz
-        
-        header("Location: dashboard.php");
-        exit;
+    if ($user) {
+        // Ikkita tekshiruv: 
+        // 1. password_verify — shifrlangan parollar uchun
+        // 2. $password === $user['password'] — shifrlanmagan (oddiy) parollar uchun
+        if (password_verify($password, $user['password']) || $password === $user['password']) {
+            $_SESSION['user_id'] = $user['id'];
+            $_SESSION['role'] = $user['role'];
+            $_SESSION['fullname'] = $user['fullname'];
+            
+            header("Location: dashboard.php");
+            exit;
+        } else {
+            $error = "Parol xato!";
+        }
     } else {
-        $error = "Login xato yoki hisobingiz bloklangan!";
+        $error = "Foydalanuvchi topilmadi yoki hisobingiz bloklangan!";
     }
 }
 ?>
