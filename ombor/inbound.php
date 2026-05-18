@@ -1,4 +1,7 @@
 <?php
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
 session_start();
 require 'db.php'; // DB bog'lanish
 // QR code kutubxonasini qo'shish (phpqrcode.php fayli phpqrcode papkasida bo'lishi kerak)
