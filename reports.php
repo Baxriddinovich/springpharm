@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 date_default_timezone_set('Asia/Tashkent');
 // reports.php - Hisobotlar (MUKAMMAL VERSIYA)
 require_once 'db.php';
@@ -9,10 +9,10 @@ $auditId = (int) ($_GET['audit'] ?? 0);
 $viewMode = $_GET['view'] ?? 'report'; // report, summary, comparison
 $error = '';
 
-// ⭐ Role-based access: auditor o'z auditlarigina ko'radi
+// в­ђ Role-based access: auditor o'z auditlarigina ko'radi
 $canViewAll = in_array($user['role'], ['super_admin', 'bosh_auditor']);
 
-// ⭐ GMP Gradlash funksiyasi
+// в­ђ GMP Gradlash funksiyasi
 function getGmpGrade(float $percentage): array
 {
     if ($percentage >= 90)
@@ -43,7 +43,7 @@ foreach ($signatures as $sig) {
     }
 }
 
-// ⭐ Hisobot ma'lumotlarini olish
+// в­ђ Hisobot ma'lumotlarini olish
 if ($auditId) {
     // Access tekshirish
     $accessCheck = $pdo->prepare("
@@ -107,7 +107,7 @@ if ($auditId) {
             $sectionResults->execute([$auditId]);
             $sections = $sectionResults->fetchAll();
 
-            // ⭐ Nomuvofiqliklar (CAPA holati bilan)
+            // в­ђ Nomuvofiqliklar (CAPA holati bilan)
             $ncs = $pdo->prepare("
                 SELECT nc.*, st.name as severity_name, st.color_code, 
                        cq.question_text, gs.section_number, gs.section_name as section_name,
@@ -130,7 +130,7 @@ if ($auditId) {
             $percentage = $maxScore > 0 ? round(($totalScore / $maxScore) * 100, 1) : 0;
             $gmpGrade = getGmpGrade($percentage);
 
-            // ⭐ NC statistikasi
+            // в­ђ NC statistikasi
             $ncStats = [
                 'total' => count($nonConformities),
                 'critical' => count(array_filter($nonConformities, fn($nc) => $nc['severity_id'] == 3)),
@@ -175,7 +175,7 @@ if ($canViewAll) {
 }
 $audits = $auditsStmt->fetchAll();
 
-// ⭐ Umumiy statistika kartochkalari uchun
+// в­ђ Umumiy statistika kartochkalari uchun
 $globalStats = [
     'total_completed' => $pdo->query("SELECT COUNT(*) FROM audits WHERE status = 'completed'")->fetchColumn(),
     'avg_score' => $pdo->query("SELECT ROUND(AVG(percentage_score), 1) FROM audits WHERE status = 'completed' AND percentage_score > 0")->fetchColumn() ?: 0,
@@ -377,7 +377,7 @@ $globalStats = [
             border-radius: 3px;
         }
 
-        /* ⭐ Print Styles */
+        /* в­ђ Print Styles */
         @media print {
 
             .sidebar,
@@ -472,141 +472,9 @@ $globalStats = [
 <body class="min-h-screen text-slate-100">
 
     <!-- Mobile Header -->
-    <div
-        class="lg:hidden fixed top-0 left-0 right-0 z-40 bg-slate-900/95 backdrop-blur-xl border-b border-slate-700/50 px-4 py-3 flex items-center justify-between no-print">
-        <div class="flex items-center gap-2">
-            <div
-                class="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-500 to-teal-500 flex items-center justify-center">
-                <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                </svg>
-            </div>
-            <span class="font-bold text-white text-sm">GMP Audit</span>
-        </div>
-        <button onclick="toggleSidebar()"
-            class="text-slate-400 hover:text-white p-2 rounded-lg hover:bg-slate-800 transition-colors"
-            aria-label="Menyu">
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
-            </svg>
-        </button>
-    </div>
+<?php $activePage = "reports"; include "inc/sidebar.php"; ?>
 
-    <div id="overlay" onclick="toggleSidebar()" class="fixed inset-0 bg-black/50 z-40 hidden lg:hidden no-print"></div>
 
-    <div class="flex min-h-screen pt-14 lg:pt-0">
-        <!-- Sidebar -->
-        <aside id="sidebar" class="sidebar w-64 fixed h-full z-50 no-print" role="navigation"
-            aria-label="Asosiy navigatsiya">
-            <div class="p-6 h-full flex flex-col">
-                <div class="flex items-center gap-3 mb-8">
-                    <div
-                        class="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500 to-teal-500 flex items-center justify-center">
-                        <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                        </svg>
-                    </div>
-                    <div>
-                        <h1 class="text-lg font-bold text-white">GMP Audit</h1>
-                        <p class="text-xs text-slate-500 font-mono">v2.0 Pro</p>
-                    </div>
-                </div>
-
-                <nav class="space-y-1 flex-1 overflow-y-auto">
-                    <a href="dashboard.php"
-                        class="nav-item flex items-center gap-3 px-4 py-3 rounded-lg text-slate-400 hover:text-white">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
-                        </svg>
-                        Bosh panel
-                    </a>
-                    <a href="audits.php"
-                        class="nav-item flex items-center gap-3 px-4 py-3 rounded-lg text-slate-400 hover:text-white">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                        </svg>
-                        Auditlar
-                    </a>
-                    <!-- <a href="non_conformities.php" class="nav-item flex items-center gap-3 px-4 py-3 rounded-lg text-slate-400 hover:text-white">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
-                        Nomuvofiqliklar
-                    </a> -->
-                    <a href="reports.php"
-                        class="nav-item active flex items-center gap-3 px-4 py-3 rounded-lg text-white"
-                        aria-current="page">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                        </svg>
-                        Hisobotlar
-                    </a>
-
-                    <div class="pt-4 mt-4 border-t border-slate-700/50">
-                        <p class="px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Boshqaruv</p>
-                        <a href="sections.php"
-                            class="nav-item flex items-center gap-3 px-4 py-3 rounded-lg text-slate-400 hover:text-white">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                    d="M4 6h16M4 10h16M4 14h16M4 18h16" />
-                            </svg>
-                            Bo'limlar
-                        </a>
-                        <a href="checklists.php"
-                            class="nav-item flex items-center gap-3 px-4 py-3 rounded-lg text-slate-400 hover:text-white">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                    d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
-                            </svg>
-                            Checklistlar
-                        </a>
-                        <a href="users.php"
-                            class="nav-item flex items-center gap-3 px-4 py-3 rounded-lg text-slate-400 hover:text-white">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                    d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-                            </svg>
-                            Auditorlar
-                        </a>
-                        <a href="logs.php"
-                            class="nav-item flex items-center gap-3 px-4 py-3 rounded-lg text-slate-400 hover:text-white">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                    d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
-                            </svg>
-                            Tizim Tarixi
-                        </a>
-                    </div>
-                </nav>
-
-                <div class="border-t border-slate-700/50 pt-4 mt-4">
-                    <div class="flex items-center gap-3">
-                        <div
-                            class="w-10 h-10 rounded-full bg-gradient-to-br from-cyan-500 to-teal-500 flex items-center justify-center text-white font-semibold text-sm">
-                            <?php echo strtoupper(mb_substr($user['full_name'], 0, 1)); ?>
-                        </div>
-                        <div class="flex-1 min-w-0">
-                            <p class="text-sm font-medium text-white truncate">
-                                <?php echo htmlspecialchars($user['full_name']); ?>
-                            </p>
-                            <p class="text-xs text-slate-500">
-                                <?php echo ucfirst(str_replace('_', ' ', $user['role'])); ?>
-                            </p>
-                        </div>
-                        <a href="logout.php" class="text-slate-500 hover:text-red-400 transition-colors p-2"
-                            aria-label="Chiqish">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                    d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                            </svg>
-                        </a>
-                    </div>
-                </div>
-            </div>
-        </aside>
 
         <!-- Main Content -->
         <main class="flex-1 lg:ml-64 w-full">
@@ -641,7 +509,7 @@ $globalStats = [
                                     <span class="hidden sm:inline">Chop etish</span>
                                 </button>
 
-                                <!-- ⭐ IMZO TUGMASI -->
+                                <!-- в­ђ IMZO TUGMASI -->
                                 <?php if (in_array($user['role'], ['auditor', 'bosh_auditor', 'super_admin'])): ?>
                                     <?php if (!$alreadySigned): ?>
                                         <button onclick="openSignModal()" class="flex items-center gap-2 bg-emerald-500/15 hover:bg-emerald-500/25 
@@ -688,7 +556,7 @@ $globalStats = [
                                     d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
                             <span><?php echo $error; ?></span>
-                            <a href="reports.php" class="ml-auto text-sm hover:underline">← Orqaga</a>
+                            <a href="reports.php" class="ml-auto text-sm hover:underline">в†ђ Orqaga</a>
                         </div>
                     </div>
                 <?php endif; ?>
@@ -696,7 +564,7 @@ $globalStats = [
                 <?php if (!$auditId || isset($error)): ?>
                     <!-- ==================== AUDIT TANLASH ==================== -->
 
-                    <!-- ⭐ Umumiy statistika -->
+                    <!-- в­ђ Umumiy statistika -->
                     <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
                         <div class="stat-card rounded-2xl p-5 animate-in delay-1">
                             <div class="w-10 h-10 rounded-xl bg-cyan-500/20 flex items-center justify-center mb-3">
@@ -748,15 +616,15 @@ $globalStats = [
                         <h2 class="text-lg font-semibold text-white mb-4">Hisobot ko'rish uchun audit tanlang</h2>
                         <select onchange="if(this.value) window.location.href='?audit='+this.value"
                             class="input-field w-full px-4 py-3 rounded-xl text-base">
-                            <option value="">— Audit tanlang —</option>
+                            <option value="">вЂ” Audit tanlang вЂ”</option>
                             <?php foreach ($audits as $a):
                                 $aGrade = getGmpGrade((float) $a['percentage_score']);
                                 ?>
                                 <option value="<?php echo $a['id']; ?>">
-                                    <?php echo htmlspecialchars($a['audit_code']); ?> —
+                                    <?php echo htmlspecialchars($a['audit_code']); ?> вЂ”
                                     <?php echo htmlspecialchars($a['title']); ?>
                                     (<?php echo htmlspecialchars($a['site_name']); ?>)
-                                    [<?php echo $aGrade['grade']; ?> — <?php echo $a['percentage_score']; ?>%]
+                                    [<?php echo $aGrade['grade']; ?> вЂ” <?php echo $a['percentage_score']; ?>%]
                                 </option>
                             <?php endforeach; ?>
                         </select>
@@ -835,7 +703,7 @@ $globalStats = [
                                                 <td class="py-3 text-right">
                                                     <a href="?audit=<?php echo $a['id']; ?>"
                                                         class="text-cyan-400 hover:text-cyan-300 text-sm font-medium">
-                                                        Hisobot →
+                                                        Hisobot в†’
                                                     </a>
                                                 </td>
                                             </tr>
@@ -862,7 +730,7 @@ $globalStats = [
                     <!-- ==================== HISOBOT ==================== -->
                     <div class="space-y-6">
 
-                        <!-- ⭐ Report Header -->
+                        <!-- в­ђ Report Header -->
                         <div class="stat-card rounded-2xl p-6 lg:p-8 animate-in">
                             <div class="grid lg:grid-cols-3 gap-8">
                                 <!-- Left: Audit Info -->
@@ -915,7 +783,7 @@ $globalStats = [
                                                 <span class="text-slate-500">Muddat:</span>
                                                 <span
                                                     class="text-white"><?php echo date('d.m.Y', strtotime($audit['start_date'])); ?>
-                                                    — <?php echo date('d.m.Y', strtotime($audit['end_date'])); ?></span>
+                                                    вЂ” <?php echo date('d.m.Y', strtotime($audit['end_date'])); ?></span>
                                             </div>
                                             <div class="flex items-center gap-2 text-slate-400">
                                                 <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor"
@@ -957,16 +825,16 @@ $globalStats = [
                                         <div class="text-xs text-slate-500 mt-1"><?php echo $gmpGrade['desc']; ?></div>
                                     </div>
 
-                                    <!-- ⭐ Previous comparison -->
+                                    <!-- в­ђ Previous comparison -->
                                     <?php if ($prevAudit): ?>
                                         <div class="mt-4 text-center text-xs">
                                             <?php $diff = round($percentage - (float) $prevAudit['percentage_score'], 1); ?>
                                             <?php if ($diff > 0): ?>
-                                                <span class="text-emerald-400">↑ +<?php echo $diff; ?>% dan oldingi</span>
+                                                <span class="text-emerald-400">в†‘ +<?php echo $diff; ?>% dan oldingi</span>
                                             <?php elseif ($diff < 0): ?>
-                                                <span class="text-red-400">↓ <?php echo $diff; ?>% dan oldingi</span>
+                                                <span class="text-red-400">в†“ <?php echo $diff; ?>% dan oldingi</span>
                                             <?php else: ?>
-                                                <span class="text-slate-500">→ O'zgarmadi</span>
+                                                <span class="text-slate-500">в†’ O'zgarmadi</span>
                                             <?php endif; ?>
                                             <div class="text-slate-600 mt-0.5">
                                                 <?php echo htmlspecialchars($prevAudit['audit_code']); ?>
@@ -977,7 +845,7 @@ $globalStats = [
                             </div>
                         </div>
 
-                        <!-- ⭐ NC Summary Cards -->
+                        <!-- в­ђ NC Summary Cards -->
                         <div class="grid grid-cols-2 lg:grid-cols-5 gap-4 animate-in delay-1">
                             <div class="stat-card rounded-xl p-4 text-center">
                                 <div class="text-2xl font-bold text-white"><?php echo $ncStats['total']; ?></div>
@@ -1003,7 +871,7 @@ $globalStats = [
                             </div>
                         </div>
 
-                        <!-- ⭐ Audit Team -->
+                        <!-- в­ђ Audit Team -->
                         <?php if (!empty($teamMembers)): ?>
                             <div class="stat-card rounded-2xl p-6 animate-in delay-2">
                                 <h3 class="text-lg font-semibold text-white mb-4">Audit jamoasi</h3>
@@ -1021,7 +889,7 @@ $globalStats = [
                                                 <div class="text-xs text-slate-500">
                                                     <?php echo ucfirst(str_replace('_', ' ', $member['role'])); ?>
                                                     <?php if ($member['position'])
-                                                        echo ' · ' . htmlspecialchars($member['position']); ?>
+                                                        echo ' В· ' . htmlspecialchars($member['position']); ?>
                                                 </div>
                                             </div>
                                         </div>
@@ -1146,7 +1014,7 @@ $globalStats = [
                             </div>
                         </div>
 
-                        <!-- ⭐ Non-Conformities -->
+                        <!-- в­ђ Non-Conformities -->
                         <div class="stat-card rounded-2xl p-6 animate-in delay-4">
                             <h3 class="text-lg font-semibold text-white mb-4">
                                 Aniqlangan nomuvofiqliklar
@@ -1226,7 +1094,7 @@ $globalStats = [
                                                     <?php echo htmlspecialchars($nc['description']); ?>
                                                 </p>
                                                 <p class="text-xs text-slate-500">
-                                                    Bo'lim <?php echo htmlspecialchars($nc['section_number']); ?> ·
+                                                    Bo'lim <?php echo htmlspecialchars($nc['section_number']); ?> В·
                                                     <?php echo htmlspecialchars(mb_substr($nc['question_text'], 0, 80)); ?>             <?php if (mb_strlen($nc['question_text']) > 80)
                                                                           echo '...'; ?>
                                                 </p>
@@ -1349,7 +1217,7 @@ $globalStats = [
                     </div>
                 </div>
 
-                <!-- ⭐ Conclusion -->
+                <!-- в­ђ Conclusion -->
                 <div class="stat-card rounded-2xl p-6 animate-in delay-4">
                     <h3 class="text-lg font-semibold text-white mb-4">Xulosa va Tavsiyalar</h3>
                     <div class="space-y-4">
@@ -1491,14 +1359,14 @@ $globalStats = [
                     msgEl.classList.remove('hidden');
                     if (data.success) {
                         msgEl.className = 'mt-3 p-3 rounded-xl text-sm bg-emerald-500/10 border border-emerald-500/20 text-emerald-300';
-                        msgEl.textContent = '✓ ' + data.message;
+                        msgEl.textContent = 'вњ“ ' + data.message;
                         setTimeout(() => {
                             closeSignModal();
                             location.reload();
                         }, 1500);
                     } else {
                         msgEl.className = 'mt-3 p-3 rounded-xl text-sm bg-red-500/10 border border-red-500/20 text-red-300';
-                        msgEl.textContent = '✗ ' + data.message;
+                        msgEl.textContent = 'вњ— ' + data.message;
                     }
                 });
         }
