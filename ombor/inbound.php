@@ -28,7 +28,7 @@ if (!in_array($_SESSION['role'], ['Admin', 'Ombor mudiri'])) {
 
 // Ta'minotchilarni olish
  $suppliers = $pdo->query("SELECT * FROM suppliers WHERE status = 1 ORDER BY company_name")->fetchAll();
-
+//ASDAS
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     // Ma'lumotlarni olish
     $material_id = $_POST['material_id'] ?? null;
