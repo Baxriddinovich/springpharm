@@ -4,7 +4,7 @@
 
 $host = 'localhost';
 $dbname = 'ombor_db';
-$username = 'fastuser';
+$username = 'bobur_admin';
 $password = 'Boburbek13@@';
 
 try {
