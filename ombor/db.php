@@ -1,6 +1,4 @@
 <?php
-// OMBOR + QC TIZIMI DATABASE CONFIGURATION
-// Tayyorlovchi: GXP Service Pharm
 
 $host = 'localhost';
 $dbname = 'ombor_db';
@@ -18,7 +16,6 @@ try {
     die("Database ulanish xatosi: " . $e->getMessage());
 }
 
-// Audit trail funksiyasi
 function logAuditTrail($pdo, $action, $tableName = null, $recordId = null, $oldValues = null, $newValues = null) {
     try {
         $userId = isset($_SESSION['user_id']) ? $_SESSION['user_id'] : null;
