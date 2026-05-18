@@ -202,33 +202,27 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     <h6 class="mb-3 text-primary border-bottom pb-2">Mahsulot tafsilotlari</h6>
                     <div class="row g-3">
                         <div class="col-md-6">
-                            <label class="form-label">Mahsulot nomi <span class="text-danger">*</span></label>
-                            <select name="material_id" class="form-select" required>
-                                <option value="">Tanlang...</option>
-                                <?php foreach($materials as $m): ?>
-                                    <option value="<?= $m['id'] ?>" <?= (isset($_POST['material_id']) && $_POST['material_id'] == $m['id']) ? 'selected' : '' ?>>
-                                        <?= htmlspecialchars($m['material_name']) ?> 
-                                        <small class="text-muted">(<?= htmlspecialchars($m['material_type']) ?>)</small>
-                                    </option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
+    <label class="form-label">Mahsulot nomi <span class="text-danger">*</span></label>
+    <input type="text" 
+           name="material_name" 
+           class="form-control" 
+           value="<?= $_POST['material_name'] ?? '' ?>" 
+           placeholder="Mahsulot nomini kiriting" 
+           required>
+</div>
                         <div class="col-md-6">
                             <label class="form-label">Seriya raqami (Batch No) <span class="text-danger">*</span></label>
                             <input type="text" name="batch_number" class="form-control" value="<?= $_POST['batch_number'] ?? '' ?>" placeholder="MAS: BATCH-2024-001" required>
                         </div>
                         
                         <div class="col-md-6">
-                            <label class="form-label">Ta'minotchi</label>
-                            <select name="supplier_id" class="form-select">
-                                <option value="">Tanlang...</option>
-                                <?php foreach($suppliers as $s): ?>
-                                    <option value="<?= $s['id'] ?>" <?= (isset($_POST['supplier_id']) && $_POST['supplier_id'] == $s['id']) ? 'selected' : '' ?>>
-                                        <?= htmlspecialchars($s['company_name']) ?>
-                                    </option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
+    <label class="form-label">Ta'minotchi</label>
+    <input type="text" 
+           name="supplier_name" 
+           class="form-control" 
+           value="<?= $_POST['supplier_name'] ?? '' ?>" 
+           placeholder="Ta'minotchi nomini kiriting">
+</div>
                         <div class="col-md-6">
                             <label class="form-label">Ishlab chiqaruvchi</label>
                             <input type="text" name="manufacturer" class="form-control" value="<?= $_POST['manufacturer'] ?? '' ?>" placeholder="Ishlab chiqaruvchi nomi">
